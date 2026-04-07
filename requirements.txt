@@ -1,0 +1,9 @@
+torch>=2.2.0
+numpy
+pyyaml
+tqdm
+wandb
+pytest
+tiktoken
+datasets
+huggingface-hub
