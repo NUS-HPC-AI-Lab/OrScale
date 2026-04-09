@@ -70,6 +70,8 @@ python scripts/sweep.py --config configs/pilot_25m.yaml \
     --seeds 1 --dry-run
 ```
 
+Sweep runs keep the configured `wandb_group` (for example `pilot_25m`) and now get readable W&B names such as `pilot_25m-muon-lr0.01-seed42`, making optimizer and seed comparisons easy to filter in the dashboard.
+
 ## Running Tests
 
 ```bash
