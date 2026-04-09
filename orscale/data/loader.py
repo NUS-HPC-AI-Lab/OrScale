@@ -14,7 +14,6 @@ Two batching modes:
 from __future__ import annotations
 
 import glob
-import os
 from pathlib import Path
 from typing import Iterator
 
@@ -28,16 +27,22 @@ from torch.utils.data import Dataset, DataLoader, DistributedSampler
 # Binary shard loading (modded-nanogpt format)
 # ---------------------------------------------------------------------------
 
-def load_bin_shard(path: str | Path) -> np.ndarray:
-    """Load a modded-nanogpt .bin shard and return tokens as np.uint16 array."""
+def read_bin_shard_header(path: str | Path) -> int:
+    """Read a modded-nanogpt shard header and return the token count."""
     path = Path(path)
     header = np.fromfile(path, dtype=np.int32, count=256)
     assert header[0] == 20240520, f"Bad magic number in {path}"
     assert header[1] == 1, f"Unsupported version {header[1]} in {path}"
-    num_tokens = int(header[2])
+    return int(header[2])
+
+
+def load_bin_shard(path: str | Path, *, copy: bool = False) -> np.ndarray:
+    """Load a modded-nanogpt .bin shard as a memmap or copied array."""
+    path = Path(path)
+    num_tokens = read_bin_shard_header(path)
 
     tokens = np.memmap(path, dtype=np.uint16, mode="r", offset=256 * 4, shape=(num_tokens,))
-    return np.array(tokens)
+    return np.array(tokens) if copy else tokens
 
 
 def load_bin_shards(pattern: str) -> np.ndarray:
@@ -45,8 +50,16 @@ def load_bin_shards(pattern: str) -> np.ndarray:
     files = sorted(glob.glob(pattern))
     if not files:
         raise FileNotFoundError(f"No files match pattern: {pattern}")
-    shards = [load_bin_shard(f) for f in files]
+    shards = [load_bin_shard(f, copy=True) for f in files]
     return np.concatenate(shards)
+
+
+def _chunk_to_tensors(chunk: np.ndarray) -> tuple[Tensor, Tensor]:
+    """Convert a seq_len+1 token chunk to int64 input/target tensors."""
+    chunk64 = np.asarray(chunk, dtype=np.int64)
+    x = torch.from_numpy(chunk64[:-1])
+    y = torch.from_numpy(chunk64[1:])
+    return x, y
 
 
 # ---------------------------------------------------------------------------
@@ -71,9 +84,54 @@ class TokenDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
         start = idx * self.seq_len
         chunk = self.tokens[start : start + self.seq_len + 1]
-        x = torch.from_numpy(chunk[:-1].astype(np.int64))
-        y = torch.from_numpy(chunk[1:].astype(np.int64))
-        return x, y
+        return _chunk_to_tensors(chunk)
+
+
+class ShardedTokenDataset(Dataset):
+    """
+    Dataset backed by multiple .bin shards without concatenating them up front.
+
+    This preserves DataLoader / DistributedSampler behavior while avoiding the
+    large startup cost of materializing the full token corpus in RAM.
+    """
+
+    def __init__(self, files: list[str], seq_len: int):
+        self.files = files
+        self.seq_len = seq_len
+        self._shards: list[np.ndarray] | None = None
+
+        self.sample_counts = np.array(
+            [max((read_bin_shard_header(path) - 1) // seq_len, 0) for path in files],
+            dtype=np.int64,
+        )
+        if len(self.sample_counts) == 0 or int(self.sample_counts.sum()) == 0:
+            raise ValueError("No token samples available in matching .bin shards.")
+
+        self.cumulative_samples = np.cumsum(self.sample_counts)
+        self.num_samples = int(self.cumulative_samples[-1])
+
+    def _ensure_shards(self) -> list[np.ndarray]:
+        if self._shards is None:
+            self._shards = [load_bin_shard(path, copy=False) for path in self.files]
+        return self._shards
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
+        if idx < 0:
+            idx += self.num_samples
+        if idx < 0 or idx >= self.num_samples:
+            raise IndexError(idx)
+
+        shard_idx = int(np.searchsorted(self.cumulative_samples, idx, side="right"))
+        shard_start = 0 if shard_idx == 0 else int(self.cumulative_samples[shard_idx - 1])
+        local_idx = idx - shard_start
+        start = local_idx * self.seq_len
+
+        shard = self._ensure_shards()[shard_idx]
+        chunk = shard[start : start + self.seq_len + 1]
+        return _chunk_to_tensors(chunk)
 
 
 # ---------------------------------------------------------------------------
@@ -109,8 +167,13 @@ class StreamingTokenIterator:
         self.rng = np.random.RandomState(seed + rank)
 
     def __iter__(self) -> Iterator[tuple[Tensor, Tensor]]:
-        for file_path in self.files:
-            tokens = load_bin_shard(file_path)
+        file_order = np.arange(len(self.files))
+        if len(file_order) > 1:
+            self.rng.shuffle(file_order)
+
+        for file_idx in file_order:
+            file_path = self.files[int(file_idx)]
+            tokens = load_bin_shard(file_path, copy=False)
 
             # Partition the shard across ranks
             total_tokens = len(tokens)
@@ -123,7 +186,7 @@ class StreamingTokenIterator:
             pos = 0
             while pos + self.tokens_per_step + 1 <= len(local_tokens):
                 buf = local_tokens[pos : pos + self.tokens_per_step + 1]
-                buf = buf.astype(np.int64)
+                buf = np.asarray(buf, dtype=np.int64)
 
                 x = torch.from_numpy(buf[:-1]).view(self.batch_size, self.seq_len)
                 y = torch.from_numpy(buf[1:]).view(self.batch_size, self.seq_len)
@@ -180,9 +243,7 @@ class HFTokenDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
         start = idx * self.seq_len
         chunk = self.tokens[start : start + self.seq_len + 1]
-        x = torch.from_numpy(chunk[:-1].astype(np.int64))
-        y = torch.from_numpy(chunk[1:].astype(np.int64))
-        return x, y
+        return _chunk_to_tensors(chunk)
 
 
 # ---------------------------------------------------------------------------
@@ -219,8 +280,8 @@ def create_dataloader(
                 rank=rank, world_size=world_size, seed=seed,
             )
 
-        tokens = load_bin_shards(pattern)
-        dataset = TokenDataset(tokens, seq_len)
+        files = sorted(glob.glob(pattern))
+        dataset = ShardedTokenDataset(files, seq_len)
     else:
         hf_name = data_config.get("hf_dataset", "openwebtext")
         hf_split = "train" if split == "train" else "validation"
@@ -240,6 +301,7 @@ def create_dataloader(
         shuffle=(split == "train" and sampler is None),
         sampler=sampler,
         num_workers=num_workers,
+        persistent_workers=num_workers > 0,
         pin_memory=True,
         drop_last=True,
     )

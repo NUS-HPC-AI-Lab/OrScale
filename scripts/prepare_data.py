@@ -20,6 +20,14 @@ import tiktoken
 from datasets import load_dataset
 from tqdm import tqdm
 
+enc = tiktoken.get_encoding("gpt2")
+eot = enc._special_tokens["<|endoftext|>"]
+
+
+def tokenize(doc):
+    tokens = [eot] + enc.encode_ordinary(doc["text"])
+    return np.array(tokens, dtype=np.uint16)
+
 
 def write_datafile(filename: str, toks: np.ndarray) -> None:
     assert len(toks) < 2**31
@@ -52,14 +60,6 @@ def main():
 
     print(f"Downloading HuggingFaceFW/fineweb ({remote_name}) ...")
     fw = load_dataset("HuggingFaceFW/fineweb", name=remote_name, split="train")
-
-    enc = tiktoken.get_encoding("gpt2")
-    eot = enc._special_tokens["<|endoftext|>"]
-
-    def tokenize(doc):
-        tokens = [eot] + enc.encode_ordinary(doc["text"])
-        tokens_np = np.array(tokens, dtype=np.uint16)
-        return tokens_np
 
     nprocs = max(1, os.cpu_count() - 2)
     shard_size = args.shard_size
