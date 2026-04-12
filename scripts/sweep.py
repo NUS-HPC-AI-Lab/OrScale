@@ -11,7 +11,7 @@ Usage:
         --seeds 3
 
     python scripts/sweep.py --config configs/pilot_25m.yaml \
-        --sweep optimizer.name=adamw,muon,muon_moonlight,mutrust,muscale,muscale_alpha \
+        --sweep optimizer.name=adamw,muon,muon_moonlight,orscale_muon,orscale_muon_wd,orscale_muon_moonlight,mutrust,muscale,muscale_alpha \
         --seeds 1 --parallel 4
 """
 

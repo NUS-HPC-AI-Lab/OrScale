@@ -29,6 +29,9 @@ _MUON_FAMILY = {
     "muon",
     "muon_moonlight",
     "orscale_original",
+    "orscale_muon",
+    "orscale_muon_wd",
+    "orscale_muon_moonlight",
     "mutrust",
     "muscale",
     "muscale_alpha",
@@ -85,7 +88,8 @@ def build_optimizer(
 
     Args:
         name: Optimizer name. One of 'adamw', 'lamb', 'muon', 'muon_moonlight',
-              'orscale_original', 'mutrust', 'muscale', 'muscale_alpha'.
+              'orscale_original', 'orscale_muon', 'orscale_muon_wd',
+              'orscale_muon_moonlight', 'mutrust', 'muscale', 'muscale_alpha'.
         model: The nn.Module to optimize.
         config: Dict of optimizer hyperparameters. Keys depend on the optimizer.
             Common keys: lr, weight_decay.
@@ -164,7 +168,15 @@ def build_optimizer(
         )
     else:
         # OrScale variants
-        variant = name if name in ("orscale_original", "mutrust", "muscale", "muscale_alpha") else config.get("variant", name)
+        variant = name if name in {
+            "orscale_original",
+            "orscale_muon",
+            "orscale_muon_wd",
+            "orscale_muon_moonlight",
+            "mutrust",
+            "muscale",
+            "muscale_alpha",
+        } else config.get("variant", name)
         matrix_opt = OrScaleOptimizer(
             matrix_params,
             lr=config.get("lr", 0.02),

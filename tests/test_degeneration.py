@@ -6,6 +6,7 @@ These are critical correctness tests from the research plan:
 1. MuScale with r_min = r_max = 1.0 should match Muon + Moonlight RMS.
 2. MuScale-alpha with alpha = 0.0 should match Muon + Moonlight RMS.
 3. OrScale-original with EMA momentum matches the PDF formulation.
+4. New trust-on-baseline variants should reduce to their Muon baselines when r = 1.
 """
 
 import math
@@ -96,6 +97,113 @@ def test_muscale_alpha_zero_matches_muon_moonlight():
     rel_diff = (diff / ref).item()
     assert rel_diff < 0.01, \
         f"MuScale-alpha(a=0) vs Muon+Moonlight relative diff = {rel_diff:.6f} (expected < 0.01)"
+
+
+def test_orscale_muon_constant_ratio_matches_muon():
+    """OrScale-Muon with r=1 should exactly recover standard Muon."""
+    lr = 0.02
+    mu = 0.95
+    wd = 0.0
+    steps = 10
+
+    w_orscale_muon = _get_weight_after_steps(
+        OrScaleOptimizer,
+        {"lr": lr, "momentum": mu, "weight_decay": wd,
+         "variant": "orscale_muon", "r_min": 1.0, "r_max": 1.0},
+        steps=steps,
+    )
+
+    w_muon = _get_weight_after_steps(
+        Muon,
+        {"lr": lr, "momentum": mu, "weight_decay": wd, "moonlight_rms": False},
+        steps=steps,
+    )
+
+    diff = (w_orscale_muon.float() - w_muon.float()).norm()
+    ref = w_muon.float().norm()
+    rel_diff = (diff / ref).item()
+    assert rel_diff < 0.01, \
+        f"OrScale-Muon(r=1) vs Muon relative diff = {rel_diff:.6f} (expected < 0.01)"
+
+
+def test_orscale_muon_moonlight_constant_ratio_matches_muon_moonlight():
+    """OrScale-Muon-Moonlight with r=1 should recover Muon + Moonlight."""
+    lr = 0.02
+    mu = 0.95
+    wd = 0.0
+    steps = 10
+
+    w_orscale_ml = _get_weight_after_steps(
+        OrScaleOptimizer,
+        {"lr": lr, "momentum": mu, "weight_decay": wd,
+         "variant": "orscale_muon_moonlight", "r_min": 1.0, "r_max": 1.0},
+        steps=steps,
+    )
+
+    w_muon_ml = _get_weight_after_steps(
+        Muon,
+        {"lr": lr, "momentum": mu, "weight_decay": wd, "moonlight_rms": True},
+        steps=steps,
+    )
+
+    diff = (w_orscale_ml.float() - w_muon_ml.float()).norm()
+    ref = w_muon_ml.float().norm()
+    rel_diff = (diff / ref).item()
+    assert rel_diff < 0.01, \
+        f"OrScale-Muon-Moonlight(r=1) vs Muon+Moonlight relative diff = {rel_diff:.6f} (expected < 0.01)"
+
+
+def test_orscale_muon_wd_constant_ratio_matches_muon_weight_decay():
+    """With r=1, trust-scaled decay collapses to the standard Muon wd update."""
+    lr = 0.02
+    mu = 0.95
+    wd = 0.1
+    steps = 10
+
+    w_orscale_wd = _get_weight_after_steps(
+        OrScaleOptimizer,
+        {"lr": lr, "momentum": mu, "weight_decay": wd,
+         "variant": "orscale_muon_wd", "r_min": 1.0, "r_max": 1.0},
+        steps=steps,
+    )
+
+    w_muon = _get_weight_after_steps(
+        Muon,
+        {"lr": lr, "momentum": mu, "weight_decay": wd, "moonlight_rms": False},
+        steps=steps,
+    )
+
+    diff = (w_orscale_wd.float() - w_muon.float()).norm()
+    ref = w_muon.float().norm()
+    rel_diff = (diff / ref).item()
+    assert rel_diff < 0.01, \
+        f"OrScale-Muon-WD(r=1) vs Muon(wd) relative diff = {rel_diff:.6f} (expected < 0.01)"
+
+
+def test_orscale_muon_wd_differs_when_trust_ratio_scales_decay():
+    """When r != 1 and wd > 0, the WD-scaled variant should differ from decoupled Muon."""
+    lr = 0.02
+    mu = 0.95
+    wd = 0.1
+    steps = 5
+
+    w_orscale_muon = _get_weight_after_steps(
+        OrScaleOptimizer,
+        {"lr": lr, "momentum": mu, "weight_decay": wd,
+         "variant": "orscale_muon", "r_min": 0.5, "r_max": 0.5},
+        steps=steps,
+    )
+
+    w_orscale_wd = _get_weight_after_steps(
+        OrScaleOptimizer,
+        {"lr": lr, "momentum": mu, "weight_decay": wd,
+         "variant": "orscale_muon_wd", "r_min": 0.5, "r_max": 0.5},
+        steps=steps,
+    )
+
+    diff = (w_orscale_muon.float() - w_orscale_wd.float()).norm()
+    assert diff > 1e-3, \
+        f"Expected trust-scaled WD variant to differ, but diff = {diff:.6f}"
 
 
 def test_mutrust_vs_muscale_differ():

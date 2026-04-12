@@ -12,7 +12,7 @@ venv/
 env/
 
 # Data (large binary files)
-data/
+/data/
 *.bin
 
 # Checkpoints

@@ -218,7 +218,17 @@ def log_run_summary(
         opt_cfg.get("weight_decay", "default"),
         opt_cfg.get("momentum", "n/a"),
     )
-    if opt_cfg.get("name", "").lower() in {"muon", "muon_moonlight", "orscale_original", "mutrust", "muscale", "muscale_alpha"}:
+    if opt_cfg.get("name", "").lower() in {
+        "muon",
+        "muon_moonlight",
+        "orscale_original",
+        "orscale_muon",
+        "orscale_muon_wd",
+        "orscale_muon_moonlight",
+        "mutrust",
+        "muscale",
+        "muscale_alpha",
+    }:
         log_main(
             "  optimizer extras: ns_iters=%s adamw_lr=%s alpha=%s r_min=%s r_max=%s",
             opt_cfg.get("ns_iters", 5),

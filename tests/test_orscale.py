@@ -2,7 +2,7 @@
 Tests for OrScale optimizer variants.
 
 Verifies:
-1. All four variants run without error and update parameters.
+1. All supported variants run without error and update parameters.
 2. Trust ratio is computed and clipped correctly.
 3. Gradient flow is correct (loss decreases).
 4. Diagnostic dict is populated.
@@ -49,7 +49,13 @@ def _run_optimizer_steps(opt_cls, opt_kwargs, steps=10):
 
 
 @pytest.mark.parametrize("variant", [
-    "orscale_original", "mutrust", "muscale", "muscale_alpha"
+    "orscale_original",
+    "orscale_muon",
+    "orscale_muon_wd",
+    "orscale_muon_moonlight",
+    "mutrust",
+    "muscale",
+    "muscale_alpha",
 ])
 def test_orscale_variants_run(variant):
     """Each variant should run without error."""

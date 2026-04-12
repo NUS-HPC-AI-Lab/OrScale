@@ -1,14 +1,16 @@
 """
 OrScale optimizer family: Orthogonalized updates with layer-wise trust-ratio scaling.
 
-Combines Muon's orthogonalized update direction with a redesigned layer-wise trust
-ratio for update magnitude control. Four variants are implemented as a single
-configurable class:
+Combines Muon's orthogonalized update direction with several layer-wise trust
+ratio designs in a single configurable class. Seven variants are implemented:
 
-    OrScale-original : EMA momentum,    ||Q||_F denominator,     no shape norm
-    MuTrust          : Nesterov,         ||M_hat||_F denominator, no shape norm
-    MuScale          : Nesterov,         RMS(M_hat) denominator,  sqrt(max(m,n)) shape norm
-    MuScale-alpha    : Nesterov,         RMS(M_hat) denominator,  sqrt(max(m,n)) shape norm, partial exponent
+    OrScale-original       : EMA momentum,      ||Q||_F denominator,     no shape norm
+    OrScale-Muon           : Nesterov,          ||Q||_F denominator,     no shape norm
+    OrScale-Muon-WD        : Nesterov,          ||Q||_F denominator,     trust ratio scales weight decay + Muon update
+    OrScale-Muon-Moonlight : Nesterov,          ||Q||_F denominator,     sqrt(max(m,n)) shape norm
+    MuTrust                : Nesterov,          ||M_hat||_F denominator, no shape norm
+    MuScale                : Nesterov,          RMS(M_hat) denominator,  sqrt(max(m,n)) shape norm
+    MuScale-alpha          : Nesterov,          RMS(M_hat) denominator,  sqrt(max(m,n)) shape norm, partial exponent
 
 See the OrScale research memo for the full derivation and motivation.
 """
@@ -28,6 +30,9 @@ from orscale.optim.newton_schulz import orthogonalize
 
 class OrScaleVariant(str, Enum):
     ORSCALE_ORIGINAL = "orscale_original"
+    ORSCALE_MUON = "orscale_muon"
+    ORSCALE_MUON_WD = "orscale_muon_wd"
+    ORSCALE_MUON_MOONLIGHT = "orscale_muon_moonlight"
     MUTRUST = "mutrust"
     MUSCALE = "muscale"
     MUSCALE_ALPHA = "muscale_alpha"
@@ -35,7 +40,7 @@ class OrScaleVariant(str, Enum):
 
 class OrScaleOptimizer(Optimizer):
     """
-    Unified OrScale optimizer implementing all four variants.
+    Unified OrScale optimizer implementing all supported variants.
 
     General algorithm for each 2D parameter W of shape (m, n):
 
@@ -45,7 +50,9 @@ class OrScaleOptimizer(Optimizer):
         4. Q_t = NS_k(M_hat_t)                     [orthogonalization]
         5. r_t = (num(W) / (den(M_hat) + eps))^alpha  [trust ratio]
         6. r_hat_t = clip(r_t, r_min, r_max)
-        7. W_{t+1} = (1 - lr*wd)*W_t - lr * r_hat_t * shape_scale * Q_t
+        7. Apply either:
+           a) decoupled decay: W_{t+1} = (1 - lr*wd)*W_t - lr * r_hat_t * shape_scale * Q_t
+           b) trust-scaled decay: W_{t+1} = W_t - lr * r_hat_t * (wd * W_t + shape_scale * Q_t)
 
     The variant determines the choice of numerator/denominator norms, momentum
     type, shape normalization, and exponent.
@@ -55,7 +62,8 @@ class OrScaleOptimizer(Optimizer):
         lr: Learning rate (default: 0.02).
         momentum: Momentum coefficient (default: 0.95).
         weight_decay: Decoupled weight decay (default: 0.0).
-        variant: One of 'orscale_original', 'mutrust', 'muscale', 'muscale_alpha'.
+        variant: One of 'orscale_original', 'orscale_muon', 'orscale_muon_wd',
+            'orscale_muon_moonlight', 'mutrust', 'muscale', 'muscale_alpha'.
         alpha: Trust ratio exponent. Only used for muscale_alpha (default: 0.5).
         r_min: Lower clipping bound for trust ratio (default: 0.1).
         r_max: Upper clipping bound for trust ratio (default: 10.0).
@@ -78,6 +86,8 @@ class OrScaleOptimizer(Optimizer):
     ):
         if lr < 0.0:
             raise ValueError(f"Invalid learning rate: {lr}")
+        if momentum < 0.0 or momentum >= 1.0:
+            raise ValueError(f"Invalid momentum: {momentum}")
 
         variant_enum = OrScaleVariant(variant)
 
@@ -117,8 +127,18 @@ class OrScaleOptimizer(Optimizer):
 
             use_nesterov = variant != OrScaleVariant.ORSCALE_ORIGINAL
             use_rms = variant in (OrScaleVariant.MUSCALE, OrScaleVariant.MUSCALE_ALPHA)
-            use_shape_norm = variant in (OrScaleVariant.MUSCALE, OrScaleVariant.MUSCALE_ALPHA)
-            use_ortho_denom = variant == OrScaleVariant.ORSCALE_ORIGINAL
+            use_shape_norm = variant in (
+                OrScaleVariant.ORSCALE_MUON_MOONLIGHT,
+                OrScaleVariant.MUSCALE,
+                OrScaleVariant.MUSCALE_ALPHA,
+            )
+            use_ortho_denom = variant in (
+                OrScaleVariant.ORSCALE_ORIGINAL,
+                OrScaleVariant.ORSCALE_MUON,
+                OrScaleVariant.ORSCALE_MUON_WD,
+                OrScaleVariant.ORSCALE_MUON_MOONLIGHT,
+            )
+            scale_wd_with_trust = variant == OrScaleVariant.ORSCALE_MUON_WD
             effective_alpha = alpha if variant == OrScaleVariant.MUSCALE_ALPHA else 1.0
 
             for p in group["params"]:
@@ -173,8 +193,14 @@ class OrScaleOptimizer(Optimizer):
                 shape_scale = math.sqrt(max(m, n)) if use_shape_norm else 1.0
 
                 # --- Update ---
-                p.mul_(1.0 - lr * wd)
-                p.add_(Q.to(p.dtype), alpha=-lr * ratio_clipped * shape_scale)
+                q_update = Q.to(p.dtype)
+                if scale_wd_with_trust:
+                    if wd != 0.0:
+                        p.add_(p, alpha=-lr * ratio_clipped * wd)
+                    p.add_(q_update, alpha=-lr * ratio_clipped * shape_scale)
+                else:
+                    p.mul_(1.0 - lr * wd)
+                    p.add_(q_update, alpha=-lr * ratio_clipped * shape_scale)
 
                 # --- Diagnostics ---
                 param_name = getattr(p, "_diag_name", None)
@@ -189,6 +215,8 @@ class OrScaleOptimizer(Optimizer):
                         "trust_ratio_raw": ratio_raw_val,
                         "trust_ratio_clipped": ratio_clipped,
                         "clip_active": abs(ratio_clipped - ratio_raw_val) > 1e-8,
+                        "shape_scale": shape_scale,
+                        "weight_decay_scaled_by_trust": scale_wd_with_trust,
                         "update_to_param_ratio": (
                             lr * ratio_clipped * shape_scale * Q.norm() / (p.norm() + eps)
                         ).item(),
