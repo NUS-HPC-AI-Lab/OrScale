@@ -1,4 +1,5 @@
 torch>=2.2.0
+torchvision>=0.17.0
 numpy
 pyyaml
 tqdm
@@ -7,3 +8,6 @@ pytest
 tiktoken
 datasets
 huggingface-hub
+lm-eval>=0.4.0
+scipy>=1.10.0
+matplotlib>=3.6.0

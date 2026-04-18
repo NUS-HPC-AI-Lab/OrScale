@@ -74,6 +74,16 @@ class Trainer:
         self.save_dir = self.config.get("save_dir", "checkpoints")
         self.use_amp = self.config.get("precision", "bfloat16") == "bfloat16"
 
+        # Optional downstream (lm-eval) evaluation hook
+        self.downstream_eval_every = int(self.config.get("downstream_eval_every", 0))
+        self.downstream_eval_tasks = list(
+            self.config.get("downstream_eval_tasks", ["hellaswag"])
+        )
+        self.downstream_eval_batch_size = int(
+            self.config.get("downstream_eval_batch_size", 8)
+        )
+        self.downstream_eval_limit = self.config.get("downstream_eval_limit")
+
         self._wandb = None
         if self.config.get("wandb_project") and is_main_process():
             try:
@@ -166,6 +176,14 @@ class Trainer:
             if self.save_every > 0 and step % self.save_every == 0 and is_main_process():
                 self.save_checkpoint(step)
 
+            # --- Downstream eval (optional) ---
+            if (
+                self.downstream_eval_every > 0
+                and step % self.downstream_eval_every == 0
+                and is_main_process()
+            ):
+                self._run_downstream_eval(step)
+
         # Final validation
         if self.val_loader is not None:
             val_loss = self.validate()
@@ -240,3 +258,34 @@ class Trainer:
         while True:
             for batch in loader:
                 yield batch
+
+    def _run_downstream_eval(self, step: int) -> None:
+        """Run lm-evaluation-harness on the current model (main process only)."""
+        try:
+            from orscale.eval.downstream import run_downstream
+        except ImportError as err:
+            print(f"Skipping downstream eval (missing dep): {err}")
+            return
+
+        try:
+            results = run_downstream(
+                model_or_ckpt=self.raw_model,
+                tasks=self.downstream_eval_tasks,
+                batch_size=self.downstream_eval_batch_size,
+                limit=self.downstream_eval_limit,
+                device=self.device,
+            )
+        except Exception as err:  # noqa: BLE001
+            print(f"Downstream eval failed at step {step}: {err}")
+            return
+
+        flat: dict[str, float] = {}
+        for task, metrics in results.get("results", {}).items():
+            for metric_name, value in metrics.items():
+                if isinstance(value, (int, float)):
+                    flat[f"downstream/{task}/{metric_name}"] = float(value)
+
+        print(f"step {step} | downstream: "
+              + " ".join(f"{k.split('/')[-1]}={v:.3f}" for k, v in flat.items()))
+        if self._wandb is not None:
+            self._wandb.log(flat, step=step)

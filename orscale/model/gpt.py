@@ -59,6 +59,24 @@ PRESET_CONFIGS = {
     "medium": GPTConfig(
         num_layers=24, num_heads=16, head_dim=64, model_dim=1024, max_seq_len=1024,
     ),
+    # Moonlight Table 2 scaling-law presets (approximate sizes).
+    # Total params are measured empirically; the ``_XXXm`` / ``_XXb`` suffix
+    # reflects the Moonlight paper's naming.
+    "xs_400m": GPTConfig(
+        num_layers=24, num_heads=16, head_dim=64, model_dim=1024, max_seq_len=2048,
+    ),
+    "s_550m": GPTConfig(
+        num_layers=20, num_heads=20, head_dim=64, model_dim=1280, max_seq_len=2048,
+    ),
+    "m_800m": GPTConfig(
+        num_layers=24, num_heads=24, head_dim=64, model_dim=1536, max_seq_len=2048,
+    ),
+    "l_1_1b": GPTConfig(
+        num_layers=24, num_heads=28, head_dim=64, model_dim=1792, max_seq_len=2048,
+    ),
+    "xl_1_5b": GPTConfig(
+        num_layers=24, num_heads=32, head_dim=64, model_dim=2048, max_seq_len=2048,
+    ),
 }
 
 
@@ -275,16 +293,30 @@ class GPT(nn.Module):
         Tag each parameter with ``muon_class`` and ``_diag_name`` attributes
         so the optimizer factory and diagnostic logger can identify them.
 
-        Matrix params (2D Linear weights, excluding embeddings/lm_head) get
+        Following Keller Jordan's Muon blog ("Empirical considerations"), the
+        following parameters should use AdamW rather than Muon:
+          * all ``nn.Embedding`` weights (token embeddings, learned positional
+            embeddings, etc.) -- they are input-layer parameters,
+          * the final classifier head ``lm_head.weight`` when it is not tied
+            to the token embedding -- it is the output-layer parameter,
+          * all scalar / vector parameters (RMSNorm / LayerNorm gains, biases).
+
+        Matrix params (2D Linear weights in hidden layers) get
         ``muon_class = "matrix"``. Everything else gets ``muon_class = "nonmatrix"``.
         """
-        embedding_ids = {id(self.tok_emb.weight)}
-        if not self.config.tie_weights:
-            embedding_ids.add(id(self.lm_head.weight))
+        # Collect weight ids for every embedding sub-module. Covers both the
+        # token embedding and the (optional) learned positional embedding.
+        nonmatrix_ids = {
+            id(m.weight) for m in self.modules() if isinstance(m, nn.Embedding)
+        }
+        # The LM head is an output layer -- always route to AdamW. When
+        # tie_weights=True its weight tensor is shared with tok_emb and is
+        # already in the set above; we add explicitly for the untied case.
+        nonmatrix_ids.add(id(self.lm_head.weight))
 
         for name, p in self.named_parameters():
             p._diag_name = name
-            if p.ndim == 2 and id(p) not in embedding_ids:
+            if p.ndim == 2 and id(p) not in nonmatrix_ids:
                 p.muon_class = "matrix"
             else:
                 p.muon_class = "nonmatrix"

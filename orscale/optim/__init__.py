@@ -39,9 +39,15 @@ _MUON_FAMILY = {
 
 
 def _split_params(model: nn.Module) -> tuple[list[nn.Parameter], list[nn.Parameter]]:
-    """Split model parameters into matrix (2D) and non-matrix groups.
+    """Split model parameters into matrix and non-matrix groups.
 
-    Matrix params = weight tensors with ndim == 2 that are not embeddings.
+    Matrix params = weight tensors that can be orthogonalized by the Muon
+    family. This includes:
+      - Linear weights (ndim == 2) that are not embeddings.
+      - Conv2d/Conv1d weights (ndim == 3 or 4) flattened internally by the
+        optimizer (see Keller Jordan's blog: conv weights are treated as
+        2D by flattening the last input dims).
+
     Non-matrix params = everything else (embeddings, norms, biases, 1D).
 
     Uses the ``muon_class`` attribute if set on a parameter; otherwise infers
@@ -65,7 +71,7 @@ def _split_params(model: nn.Module) -> tuple[list[nn.Parameter], list[nn.Paramet
             matrix_params.append(p)
         elif explicit == "nonmatrix":
             nonmatrix_params.append(p)
-        elif p.ndim == 2 and id(p) not in embedding_ids:
+        elif p.ndim >= 2 and id(p) not in embedding_ids:
             matrix_params.append(p)
         else:
             nonmatrix_params.append(p)

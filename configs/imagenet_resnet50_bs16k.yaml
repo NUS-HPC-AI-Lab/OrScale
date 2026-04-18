@@ -1,0 +1,67 @@
+# ImageNet / ResNet-50 at global batch 16K (LAMB Table 5).
+#
+# Reference: LAMB paper Table 5 (arXiv:1904.00962). Total batch 16384 across
+# 64 GPUs is the canonical setting; 90 epochs with step decay at epochs
+# 30/60/80 and 5-epoch linear warmup.
+#
+# Typical launch (8 nodes x 8 GPUs = 64 GPUs, per-rank bs=256):
+#   torchrun --nnodes=8 --nproc_per_node=8 \
+#       --rdzv_id=$SLURM_JOB_ID --rdzv_backend=c10d \
+#       --rdzv_endpoint=$MASTER_ADDR:29500 \
+#       scripts/train_vision.py --config configs/imagenet_resnet50_bs16k.yaml
+
+task: vision
+
+model:
+  name: resnet50
+  num_classes: 1000
+  zero_init_residual: true
+
+data:
+  name: imagenet
+  root: /data/imagenet       # override to your ImageNet-1K location
+  image_size: 224
+  num_workers: 16
+
+training:
+  epochs: 90
+  batch_size: 256            # per-rank; 256 * 64 = 16384 global bs
+  grad_clip: 0.0
+  precision: bfloat16
+  log_every: 100
+  save_every_epoch: 30
+  save_dir: checkpoints/imagenet_resnet50_bs16k
+  seed: 42
+  label_smoothing: 0.1
+
+optimizer:
+  # LAMB-style sqrt LR scaling: start from base_lr at base_batch=512 then
+  # scale to global batch. For LAMB/Muon at 16K, LAMB paper uses ~0.01.
+  name: muscale_alpha
+  lr: 0.002                  # base (at batch 512) -> sqrt(16384/512)=5.66x -> ~0.0113
+  sqrt_lr_scaling: true
+  sqrt_lr_scaling_base_batch: 512
+  momentum: 0.95
+  weight_decay: 1.0e-4
+  alpha: 0.5
+  r_min: 0.1
+  r_max: 10.0
+  eps: 1.0e-6
+  ns_iters: 5
+  adamw_lr: 2.0e-4           # head + stem; scaled similarly at runtime
+  adamw_betas: [0.9, 0.999]
+  adamw_weight_decay: 1.0e-4
+
+scheduler:
+  name: step
+  warmup_epochs: 5
+  milestones: [30, 60, 80]
+  gamma: 0.1
+
+diagnostics:
+  log_every: 100
+  heavy_log_every: 1000
+
+logging:
+  wandb_project: orscale-vision
+  wandb_group: imagenet_resnet50_bs16k

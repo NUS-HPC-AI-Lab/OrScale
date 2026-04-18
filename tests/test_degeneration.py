@@ -127,7 +127,15 @@ def test_orscale_muon_constant_ratio_matches_muon():
 
 
 def test_orscale_muon_moonlight_constant_ratio_matches_muon_moonlight():
-    """OrScale-Muon-Moonlight with r=1 should recover Muon + Moonlight."""
+    """
+    OrScale-Muon-Moonlight and stock Muon+Moonlight both apply the full
+    Moonlight RMS-matching scale 0.2 * sqrt(max(m, n)) to Q. With r=1 and wd=0,
+    OrScale-Muon-Moonlight's coupled update reduces to:
+
+        W -= lr * 0.2 * sqrt(max(m, n)) * Q
+
+    which is identical to Muon + Moonlight (wd=0).
+    """
     lr = 0.02
     mu = 0.95
     wd = 0.0
@@ -151,6 +159,52 @@ def test_orscale_muon_moonlight_constant_ratio_matches_muon_moonlight():
     rel_diff = (diff / ref).item()
     assert rel_diff < 0.01, \
         f"OrScale-Muon-Moonlight(r=1) vs Muon+Moonlight relative diff = {rel_diff:.6f} (expected < 0.01)"
+
+
+def test_orscale_muon_moonlight_couples_weight_decay():
+    """
+    OrScale-Muon-Moonlight folds weight decay *inside* the trust-ratio scaling:
+
+        W -= lr * r_hat * (wd * W + 0.2 * sqrt(max(m, n)) * Q)
+
+    which effectively applies a weight-decay coefficient of ``lr * r_hat * wd``.
+    The closest MuScale-family variant uses *decoupled* weight decay at full
+    strength ``lr * wd``, independent of r_hat. With r held fixed at r != 1
+    and wd > 0, the two updates must diverge.
+
+    This test guards against accidentally regressing to decoupled weight decay.
+    """
+    lr = 0.02
+    mu = 0.95
+    wd = 0.1
+    steps = 5
+    r_fixed = 0.5
+
+    w_coupled = _get_weight_after_steps(
+        OrScaleOptimizer,
+        {"lr": lr, "momentum": mu, "weight_decay": wd,
+         "variant": "orscale_muon_moonlight",
+         "r_min": r_fixed, "r_max": r_fixed},
+        steps=steps,
+    )
+
+    # Reference: MuScale forced to the same constant trust ratio r_fixed.
+    # MuScale applies the same 0.2 * sqrt(max(m, n)) * Q * r_fixed term but
+    # uses *decoupled* weight decay at full strength (lr * wd, unscaled by
+    # r_fixed). The only difference between the two runs is therefore the
+    # weight-decay coefficient, so they must diverge whenever wd > 0 and
+    # r_fixed != 1.
+    w_decoupled = _get_weight_after_steps(
+        OrScaleOptimizer,
+        {"lr": lr, "momentum": mu, "weight_decay": wd,
+         "variant": "muscale",
+         "r_min": r_fixed, "r_max": r_fixed},
+        steps=steps,
+    )
+
+    diff = (w_coupled.float() - w_decoupled.float()).norm()
+    assert diff > 1e-3, \
+        f"Expected coupled-WD OrScale-Muon-Moonlight to differ from decoupled reference, got diff = {diff:.6f}"
 
 
 def test_orscale_muon_wd_constant_ratio_matches_muon_weight_decay():

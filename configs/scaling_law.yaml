@@ -1,0 +1,65 @@
+# Scaling-law sweep (Moonlight Fig 3 / Table 3).
+#
+# For each (preset, optimizer) this launches `scripts/train.py` with the
+# overrides below, then `run_scaling_law.py` parses the final val_loss out
+# of the per-run log, writes a CSV, fits L(C) = A * C^alpha, and saves
+# `scaling_law.png`.
+#
+# Token budgets below are compute-optimal Chinchilla estimates
+# (D ≈ 20 * N). Tune per your cluster budget. Typical multi-node launch:
+#
+#   python scripts/run_scaling_law.py --config configs/scaling_law.yaml
+#
+# or, with torchrun as the underlying launcher:
+#
+#   launcher:
+#     command: torchrun
+#     extra_args: [--nnodes=4, --nproc_per_node=8,
+#                  --rdzv_id=$SLURM_JOB_ID, --rdzv_backend=c10d,
+#                  --rdzv_endpoint=$MASTER_ADDR:29500]
+
+base_config: configs/small_125m.yaml
+output_dir: results/scaling_law
+seeds: 1
+
+# Model + token budget grid.
+presets:
+  - name: xs_400m
+    params: 4.0e8
+    tokens: 8.0e9
+    max_steps: 2000
+  - name: s_550m
+    params: 5.5e8
+    tokens: 1.1e10
+    max_steps: 2500
+  - name: m_800m
+    params: 8.2e8
+    tokens: 1.6e10
+    max_steps: 3000
+  - name: l_1_1b
+    params: 1.1e9
+    tokens: 2.2e10
+    max_steps: 3500
+  - name: xl_1_5b
+    params: 1.5e9
+    tokens: 3.0e10
+    max_steps: 4000
+
+# Optimizer axis.
+optimizers:
+  - name: adamw
+    lr: 3.0e-4
+    weight_decay: 0.1
+  - name: muscale_alpha
+    lr: 0.02
+    weight_decay: 0.01
+    alpha: 0.5
+    adamw_lr: 3.0e-4
+  - name: muon_moonlight
+    lr: 0.02
+    weight_decay: 0.01
+    adamw_lr: 3.0e-4
+
+launcher:
+  command: python
+  extra_args: []
