@@ -17,6 +17,20 @@ Usage:
     # Fully automatic: downloads CIFAR-10 to data/cifar10/ .
     python scripts/prepare_vision_data.py --dataset cifar10
 
+    # ImageNet: first download the three official ILSVRC2012 tarballs.
+    # 1) Sign in (or request access) at:
+    #      https://www.image-net.org/challenges/LSVRC/2012/2012-downloads.php
+    # 2) Either download them in the browser from that page, or use wget:
+    #      mkdir -p /path/to/imagenet_tars && cd /path/to/imagenet_tars
+    #      wget -c --no-check-certificate \
+    #          https://www.image-net.org/data/ILSVRC/2012/ILSVRC2012_img_train.tar
+    #      wget -c --no-check-certificate \
+    #          https://www.image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar
+    #      wget -c --no-check-certificate \
+    #          https://www.image-net.org/data/ILSVRC/2012/ILSVRC2012_devkit_t12.tar.gz
+    #    If the image tarball wget commands download an HTML login page instead
+    #    of a tarball, use the browser download links after signing in.
+    #
     # ImageNet: extract from pre-downloaded tarballs.
     python scripts/prepare_vision_data.py --dataset imagenet \
         --src /path/to/imagenet_tars \

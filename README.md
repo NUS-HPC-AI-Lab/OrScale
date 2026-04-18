@@ -46,7 +46,24 @@ The vision entry point expects CIFAR-10 in torchvision's standard layout and Ima
 # CIFAR-10: fully automatic download via torchvision (~170 MB).
 python scripts/prepare_vision_data.py --dataset cifar10
 
-# ImageNet-1K: drop the three ILSVRC2012 tarballs into one directory, then:
+# ImageNet-1K: first download the three official ILSVRC2012 tarballs.
+mkdir -p /path/to/imagenet_tars
+cd /path/to/imagenet_tars
+
+# Sign in (or request access) at:
+#   https://www.image-net.org/challenges/LSVRC/2012/2012-downloads.php
+# Then either use the browser download links there, or try:
+wget -c --no-check-certificate \
+    https://www.image-net.org/data/ILSVRC/2012/ILSVRC2012_img_train.tar
+wget -c --no-check-certificate \
+    https://www.image-net.org/data/ILSVRC/2012/ILSVRC2012_img_val.tar
+wget -c --no-check-certificate \
+    https://www.image-net.org/data/ILSVRC/2012/ILSVRC2012_devkit_t12.tar.gz
+
+# If wget returns an HTML login page for train/val instead of a tarball,
+# download those two files from the signed-in browser session instead.
+
+# Once the tarballs are present, extract them into ImageFolder layout:
 python scripts/prepare_vision_data.py --dataset imagenet \
     --src /path/to/imagenet_tars \
     --out /data/imagenet

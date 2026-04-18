@@ -45,3 +45,7 @@ documents/
 
 # Misc
 .pytest_cache/
+
+# logs and pbs
+*.log
+*.pbs
