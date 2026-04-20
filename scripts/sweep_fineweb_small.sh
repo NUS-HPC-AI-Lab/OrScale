@@ -46,6 +46,8 @@
 #   NPROC=8 bash scripts/sweep_fineweb_small.sh           # use 8 GPUs/run
 #   SEEDS=3 bash scripts/sweep_fineweb_small.sh           # 3 seeds per cell
 #   DRY_RUN=1 bash scripts/sweep_fineweb_small.sh         # print only
+#   OPTIMIZERS="muon,muon_moonlight,orscale_muon" \
+#     bash scripts/sweep_fineweb_small.sh                 # optimizer subset
 #
 # Notes:
 #   - Run from the repo root.
@@ -89,9 +91,39 @@ declare -a JOBS=(
   "lamb                    ADAM"
 )
 
+OPTIMIZERS="${OPTIMIZERS:-}"
+declare -a SELECTED_JOBS=()
+if [[ -n "$OPTIMIZERS" ]]; then
+  # Accept comma- or space-separated names, e.g. "muon,adamw" or "muon adamw".
+  normalized_optimizers="${OPTIMIZERS//,/ }"
+  for requested_opt in $normalized_optimizers; do
+    found=0
+    for entry in "${JOBS[@]}"; do
+      read -r opt_name _fam <<< "$entry"
+      if [[ "$opt_name" == "$requested_opt" ]]; then
+        SELECTED_JOBS+=("$entry")
+        found=1
+        break
+      fi
+    done
+    if [[ "$found" -eq 0 ]]; then
+      echo "[error] unknown optimizer in OPTIMIZERS: $requested_opt" >&2
+      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight mutrust adamw lamb" >&2
+      exit 1
+    fi
+  done
+else
+  SELECTED_JOBS=("${JOBS[@]}")
+fi
+
+if [[ "${#SELECTED_JOBS[@]}" -eq 0 ]]; then
+  echo "[error] no optimizers selected." >&2
+  exit 1
+fi
+
 # Count total runs for the banner.
 total=0
-for entry in "${JOBS[@]}"; do
+for entry in "${SELECTED_JOBS[@]}"; do
   read -r _OPT FAM <<< "$entry"
   if [[ "$FAM" == "MUON" ]]; then
     total=$((total + ${#MUON_LRS[@]}))
@@ -117,6 +149,7 @@ echo "   nproc     : $NPROC (torchrun, sequential DDP runs)"
 echo "   seeds     : $SEEDS (base=$SEED_BASE)"
 echo "   muon lrs  : ${MUON_LRS[*]}"
 echo "   adam lrs  : ${ADAM_LRS[*]}"
+echo "   optimizers: ${OPTIMIZERS:-all}"
 echo "   dry-run   : $DRY_RUN"
 echo "   total     : $total runs"
 echo "   log dir   : $SWEEP_DIR"
@@ -130,7 +163,7 @@ for CONFIG in $CONFIGS; do
   fi
   CFG_STEM="$(basename "${CONFIG%.yaml}")"
 
-  for entry in "${JOBS[@]}"; do
+  for entry in "${SELECTED_JOBS[@]}"; do
     read -r OPT FAM <<< "$entry"
     if [[ "$FAM" == "MUON" ]]; then
       LRS=("${MUON_LRS[@]}")
