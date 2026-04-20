@@ -12,13 +12,14 @@ Every variant that applies "Moonlight shape normalization" uses the full Moonlig
 |---------|----------|-------------------|------------|-------------|
 | **Muon** | Nesterov | — | — | Baseline orthogonalized optimizer |
 | **Muon + Moonlight** | Nesterov | — | 0.2·sqrt(max(m,n)) | Static shape normalization |
-| **OrScale-original** | EMA | \|\|Q\|\|_F | — | Original proposal (degenerate denom) |
+| **OrScale-Muon** | Nesterov | \|\|Q\|\|_F | — | Original trust ratio on standard Muon |
+| **OrScale-Muon-WD** | Nesterov | \|\|λW + Q\|\|_F | — | Coupled WD trust ratio on full Muon update |
 | **OrScale-Muon-Moonlight** | Nesterov | \|\|λW + 0.2·sqrt(max(m,n))·Q\|\|_F | 0.2·sqrt(max(m,n)) | Dynamic trust ratio + coupled WD on Moonlight |
 | **MuTrust** | Nesterov | \|\|M_hat\|\|_F | — | Minimal fix: raw momentum denom |
-| **MuScale** | Nesterov | RMS(M_hat) | 0.2·sqrt(max(m,n)) | Width-invariant trust ratio |
-| **MuScale-alpha** | Nesterov | RMS(M_hat)^alpha | 0.2·sqrt(max(m,n)) | Partial trust ratio (best candidate) |
 
 Additional baselines: **AdamW**, **LAMB**.
+
+The research memo prioritizes the six variants above for comparison. Additional experimental variants such as **OrScale-original**, **MuScale**, and **MuScale-alpha** remain implemented for ablations and degeneration tests.
 
 ## Setup
 

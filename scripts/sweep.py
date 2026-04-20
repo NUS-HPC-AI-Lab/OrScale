@@ -58,9 +58,45 @@ def run_name(overrides: dict[str, str]) -> str:
     """Generate a short name for a run from its overrides."""
     parts = []
     for k, v in overrides.items():
+        if k == "logging.wandb_name":
+            continue
         short_key = k.split(".")[-1]
         parts.append(f"{short_key}={v}")
     return "_".join(parts)
+
+
+def load_wandb_group(config_path: str) -> str | None:
+    """Best-effort read of `logging.wandb_group` from the YAML config."""
+    try:
+        import yaml  # type: ignore
+    except ImportError:
+        return None
+    try:
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f) or {}
+    except OSError:
+        return None
+    logging_cfg = cfg.get("logging") or {}
+    group = logging_cfg.get("wandb_group")
+    return str(group) if group else None
+
+
+def make_wandb_name(group: str | None, overrides: dict[str, str]) -> str:
+    """Build a distinguishable W&B run name like `<group>-muon-lr0.01-seed42`."""
+    bits: list[str] = []
+    opt = overrides.get("optimizer.name")
+    if opt:
+        bits.append(str(opt))
+    lr = overrides.get("optimizer.lr")
+    if lr is not None:
+        bits.append(f"lr{lr}")
+    seed = overrides.get("training.seed")
+    if seed is not None:
+        bits.append(f"seed{seed}")
+    if not bits:
+        bits.append(run_name(overrides))
+    suffix = "-".join(bits)
+    return f"{group}-{suffix}" if group else suffix
 
 
 _PRINT_LOCK = threading.Lock()
@@ -97,9 +133,10 @@ def launch_run(
     config_path: str,
     overrides: dict[str, str],
     gpu_id: int | None = None,
+    script: str = "scripts/train.py",
 ) -> subprocess.Popen[str]:
     """Launch a single training run as a subprocess."""
-    cmd = [sys.executable, "scripts/train.py", "--config", config_path]
+    cmd = [sys.executable, script, "--config", config_path]
     override_args = [f"{k}={v}" for k, v in overrides.items()]
     if override_args:
         cmd += ["--set"] + override_args
@@ -133,10 +170,17 @@ def main():
     parser.add_argument("--no-stream", dest="stream", action="store_false",
                         help="Disable live streaming of train.py logs")
     parser.set_defaults(stream=True)
+    parser.add_argument("--script", type=str, default="scripts/train.py",
+                        help="Training entry point to launch (default: scripts/train.py). "
+                             "Use scripts/train_vision.py for CIFAR-10 / ImageNet sweeps.")
     args = parser.parse_args()
 
     sweep_params = parse_sweep_spec(args.sweep)
     runs = generate_runs(sweep_params, args.seeds)
+
+    wandb_group = load_wandb_group(args.config)
+    for run in runs:
+        run.setdefault("logging.wandb_name", make_wandb_name(wandb_group, run))
 
     emit(f"Sweep: {len(runs)} total runs")
     emit(f"  Params: {json.dumps(sweep_params, indent=2)}")
@@ -160,7 +204,7 @@ def main():
         for i, run in enumerate(runs):
             name = run_name(run)
             emit(f"\n--- Run {i+1}/{len(runs)}: {name} ---")
-            proc = launch_run(args.config, run)
+            proc = launch_run(args.config, run, script=args.script)
 
             log_path = os.path.join(sweep_dir, f"{name}.log")
             stream_thread = threading.Thread(
@@ -188,7 +232,7 @@ def main():
                 run = run_queue.pop(0)
                 gpu_id = len(active) % max(1, args.parallel)
                 name = run_name(run)
-                proc = launch_run(args.config, run, gpu_id=gpu_id)
+                proc = launch_run(args.config, run, gpu_id=gpu_id, script=args.script)
                 log_path = os.path.join(sweep_dir, f"{name}.log")
                 stream_thread = threading.Thread(
                     target=stream_output,
