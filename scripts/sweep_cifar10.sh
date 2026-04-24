@@ -12,6 +12,25 @@
 # Seeds per cell   : 3
 # Total runs       : (6 * 4 + 2 * 3) * 3 = 90
 #
+# Why the Moonlight-scaled variants (muon_moonlight, orscale_muon_moonlight)
+# stay on the Muon grid here, unlike sweep_fineweb_small.sh (update
+# 2026-04-22): the `0.2 * sqrt(max(m, n))` shape constant inflates the
+# per-entry update by ~5-14x on DavidNet's largest flattened conv
+# (512 x 4608). On FineWeb that same inflation, combined with 20k training
+# steps on a pre-norm transformer, produced a sustained dip -> bump -> dip
+# loss pattern (see reports/fineweb_bump/). On CIFAR the same optimizers
+# are *stable* at every LR in the Muon grid -- three stabilizing factors
+# do not apply to LM training:
+#   1. Training is ~10x shorter (~2350 vs. 20000 steps).
+#   2. DavidNet has BatchNorm, which re-centers activations every step.
+#   3. reports/cifar10_davidnet/summary_by_opt_lr.md shows each Muon-family
+#      optimizer peaks *inside* {0.005..0.04} -- no variant wants AdamW-
+#      scale LRs here. Moving them to the AdamW grid would under-sample the
+#      empirical optimum.
+# Re-run once after changing defaults (r_max/r_min tightened to 1.5/0.5 on
+# 2026-04-22) to confirm the optima haven't shifted past 0.04; if any do,
+# widen the Muon grid by adding 0.08 rather than switching to Moonlight LRs.
+#
 # Usage:
 #   bash scripts/sweep_cifar10.sh                 # full sweep
 #   DRY_RUN=1 bash scripts/sweep_cifar10.sh       # print runs without launching

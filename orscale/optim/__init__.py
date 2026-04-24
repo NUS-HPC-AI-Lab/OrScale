@@ -190,8 +190,8 @@ def build_optimizer(
             weight_decay=config.get("weight_decay", 0.0),
             variant=variant,
             alpha=config.get("alpha", 0.5),
-            r_min=config.get("r_min", 0.1),
-            r_max=config.get("r_max", 10.0),
+            r_min=config.get("r_min", 0.5),
+            r_max=config.get("r_max", 1.5),
             eps=config.get("eps", 1e-6),
             ns_iters=config.get("ns_iters", 5),
         )

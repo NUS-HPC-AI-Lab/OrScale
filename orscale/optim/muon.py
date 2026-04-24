@@ -137,16 +137,25 @@ class Muon(Optimizer):
                 p_view.mul_(1.0 - lr * wd)
                 p_view.add_(Q.to(p.dtype), alpha=-lr * scale)
 
-                # Expose diagnostics for the logger
+                # Expose diagnostics for the logger. `shape_scale` and
+                # `update_to_param_ratio` are also reported by
+                # OrScaleOptimizer so the DiagnosticLogger can aggregate
+                # them on the same keys across every Muon-family variant.
                 param_name = _get_param_name(p)
                 if param_name:
+                    w_frob = p_view.norm()
+                    q_frob = Q.norm()
                     self._diagnostics[param_name] = {
-                        "W_frob": p_view.norm().item(),
+                        "W_frob": w_frob.item(),
                         "G_frob": grad.norm().item(),
                         "M_frob": buf_view.norm().item(),
-                        "Q_frob": Q.norm().item(),
-                        "W_rms": (p_view.norm() / math.sqrt(m * n)).item(),
+                        "Q_frob": q_frob.item(),
+                        "W_rms": (w_frob / math.sqrt(m * n)).item(),
                         "M_rms": (buf_view.norm() / math.sqrt(m * n)).item(),
+                        "shape_scale": float(scale),
+                        "update_to_param_ratio": (
+                            lr * scale * q_frob / (w_frob + 1e-12)
+                        ).item(),
                     }
 
         return loss

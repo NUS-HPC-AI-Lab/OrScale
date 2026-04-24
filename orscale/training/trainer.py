@@ -74,6 +74,14 @@ class Trainer:
         self.save_dir = self.config.get("save_dir", "checkpoints")
         self.use_amp = self.config.get("precision", "bfloat16") == "bfloat16"
 
+        # Global gradient-norm clipping (applied after backward, before opt.step,
+        # so it affects every optimizer in self.optimizers -- Muon-family matrix
+        # opt, its AdamW non-matrix partner, and standalone AdamW/LAMB runs).
+        # Set to 0 or a negative value in the YAML to disable.
+        gc_raw = self.config.get("grad_clip_norm", 1.0)
+        self.grad_clip_norm = float(gc_raw) if gc_raw is not None else 0.0
+        self._last_grad_norm: float | None = None
+
         # Optional downstream (lm-eval) evaluation hook
         self.downstream_eval_every = int(self.config.get("downstream_eval_every", 0))
         self.downstream_eval_tasks = list(
@@ -123,6 +131,20 @@ class Trainer:
                 loss.backward()
                 total_loss += loss.item()
 
+            # --- Gradient clipping (global, on the raw model params) ---
+            # Using the unwrapped module is correct under DDP: DDP's gradient
+            # sync already happened inside loss.backward() on the last
+            # micro-step, so every rank sees the same grads and the clip
+            # factor is identical across ranks.
+            if self.grad_clip_norm > 0.0:
+                total_norm = torch.nn.utils.clip_grad_norm_(
+                    self.raw_model.parameters(),
+                    max_norm=self.grad_clip_norm,
+                )
+                self._last_grad_norm = float(total_norm)
+            else:
+                self._last_grad_norm = None
+
             # --- Optimizer step ---
             for opt in self.optimizers:
                 opt.step()
@@ -148,15 +170,26 @@ class Trainer:
                     "train/tokens_seen": tokens_seen,
                     "train/step": step,
                 }
+                if self._last_grad_norm is not None:
+                    log_dict["train/grad_norm_preclip"] = self._last_grad_norm
+                    log_dict["train/grad_clip_norm"] = self.grad_clip_norm
+                    log_dict["train/grad_clip_active_frac"] = float(
+                        self._last_grad_norm > self.grad_clip_norm
+                    )
 
                 if self._wandb is not None:
                     self._wandb.log(log_dict, step=step)
 
+                gn_str = (
+                    f" | grad_norm {self._last_grad_norm:.3f}"
+                    if self._last_grad_norm is not None else ""
+                )
                 print(
                     f"step {step}/{self.max_steps} | "
                     f"loss {avg_loss:.4f} | "
                     f"lr_mult {lr_mult:.4f} | "
                     f"tok/s {tok_per_sec:.0f}"
+                    f"{gn_str}"
                 )
                 running_loss = 0.0
 

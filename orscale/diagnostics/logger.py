@@ -6,6 +6,12 @@ intervals and logs them to Weights & Biases (if available) or a local dict.
 
 Light metrics (norms, trust ratios) are collected every ``log_every`` steps.
 Heavy metrics (singular values, QK logit stats) every ``heavy_log_every`` steps.
+
+In addition to per-layer keys (``diagnostics/<param>/<metric>``), a small set
+of aggregate keys (``diagnostics/_summary/<metric>_{mean,min,max,active_frac}``)
+is emitted so that training dashboards can track the most useful signals --
+trust-ratio clipping activity, update-to-param ratio, etc. -- with a single
+line rather than one per layer.
 """
 
 from __future__ import annotations
@@ -15,6 +21,21 @@ from typing import Any
 
 import torch
 from torch import Tensor, nn
+
+
+# Metric names for which we also emit cross-layer aggregate summaries
+# (mean / min / max). Booleans are additionally summarized as a
+# "<name>_active_frac" fraction.
+_AGGREGATE_METRICS: tuple[str, ...] = (
+    "trust_ratio_raw",
+    "trust_ratio_clipped",
+    "clip_active",
+    "update_to_param_ratio",
+    "W_rms",
+    "M_rms",
+    "shape_scale",
+    "weight_decay_scaled_by_trust",
+)
 
 
 class DiagnosticLogger:
@@ -75,13 +96,37 @@ class DiagnosticLogger:
         metrics: dict[str, Any] = {"step": step}
         heavy = self.should_heavy_log(step)
 
-        # Collect optimizer diagnostics
+        # Collect optimizer diagnostics. We also accumulate per-metric buckets
+        # so we can emit cross-layer aggregates below.
+        buckets: dict[str, list[float]] = {}
         for opt in self.optimizers:
             diag = getattr(opt, "_diagnostics", {})
             for param_name, param_diag in diag.items():
                 for metric_name, value in param_diag.items():
                     key = f"diagnostics/{param_name}/{metric_name}"
                     metrics[key] = value
+                    if metric_name in _AGGREGATE_METRICS:
+                        try:
+                            buckets.setdefault(metric_name, []).append(float(value))
+                        except (TypeError, ValueError):
+                            pass
+
+        # Cross-layer aggregates: one value per metric, easy to plot.
+        for metric_name, values in buckets.items():
+            if not values:
+                continue
+            prefix = f"diagnostics/_summary/{metric_name}"
+            metrics[f"{prefix}_mean"] = sum(values) / len(values)
+            metrics[f"{prefix}_min"] = min(values)
+            metrics[f"{prefix}_max"] = max(values)
+            # For booleans (clip_active, weight_decay_scaled_by_trust) the
+            # fraction of layers where the flag is set is the headline number.
+            if all(v in (0.0, 1.0) for v in values):
+                metrics[f"{prefix}_active_frac"] = (
+                    sum(values) / len(values)
+                )
+            # For a scalar like update_to_param_ratio, the max across layers
+            # is the canonical early-warning signal for instability.
 
         # Heavy metrics: singular values of momentum / orthogonalized updates
         if heavy:

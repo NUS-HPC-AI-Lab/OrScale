@@ -71,8 +71,14 @@ class OrScaleOptimizer(Optimizer):
         variant: One of 'orscale_original', 'orscale_muon', 'orscale_muon_wd',
             'orscale_muon_moonlight', 'mutrust', 'muscale', 'muscale_alpha'.
         alpha: Trust ratio exponent. Only used for muscale_alpha (default: 0.5).
-        r_min: Lower clipping bound for trust ratio (default: 0.1).
-        r_max: Upper clipping bound for trust ratio (default: 10.0).
+        r_min: Lower clipping bound for trust ratio (default: 0.5). Tightened
+            from the original 0.1 on 2026-04-22 after the ``fineweb_bump``
+            investigation showed that the loose old bounds let ``mutrust`` and
+            ``orscale_muon_moonlight`` run at ~10x the nominal LR during
+            warmup (see ``reports/fineweb_bump/`` and the sweep memo).
+        r_max: Upper clipping bound for trust ratio (default: 1.5). Same
+            rationale as ``r_min``; picked so the clip allows at most a
+            +/-50% gain over a vanilla-Muon step.
         eps: Numerical stability constant (default: 1e-6).
         ns_iters: Number of Newton-Schulz iterations (default: 5).
     """
@@ -85,8 +91,8 @@ class OrScaleOptimizer(Optimizer):
         weight_decay: float = 0.0,
         variant: str = "muscale_alpha",
         alpha: float = 0.5,
-        r_min: float = 0.1,
-        r_max: float = 10.0,
+        r_min: float = 0.5,
+        r_max: float = 1.5,
         eps: float = 1e-6,
         ns_iters: int = 5,
     ):

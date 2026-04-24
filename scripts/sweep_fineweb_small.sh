@@ -22,22 +22,31 @@
 #     Override with `--set optimizer.weight_decay=0.1` if you want to follow
 #     the paper exactly.
 #
-# Per-family LR (split grids around each family's known-good operating point):
-#   Muon family   : {0.005, 0.01, 0.02, 0.04}   (small_125m.yaml uses 0.02)
-#   AdamW / LAMB  : {3e-4, 1e-3, 3e-3}          (Moonlight Table 2 ~9.5e-4)
+# Per-family LR grids (split so each optimizer is swept around its known-good
+# operating point given its effective per-entry update magnitude at nominal LR):
+#   Muon grid          : {0.005, 0.01, 0.02, 0.04}   (Muon, mutrust)
+#   AdamW / LAMB grid  : {3e-4, 1e-3, 3e-3}          (AdamW, LAMB)
+#   Moonlight grid     : {3e-4, 1e-3, 3e-3, 1e-2}    (muon_moonlight,
+#                                                     orscale_muon_moonlight)
 #
-# Note on `muon_moonlight` / `orscale_muon_moonlight`: the Moonlight paper
-# argues that with the `0.2 * sqrt(max(m,n))` shape normalization, Muon should
-# reuse AdamW's LR (~1e-3 here). The repo's existing configs nonetheless place
-# all six Muon variants near `lr=0.02`, so we sweep them on the Muon grid for
-# consistency. If a Moonlight variant prefers the lower end of {0.005}, that
-# is still a meaningful signal worth confirming with a follow-up sweep at
-# AdamW-scale LRs.
+# Why three grids instead of two (update 2026-04-22):
+#   The `0.2 * sqrt(max(m, n))` Moonlight shape-normalization constant inflates
+#   the per-entry update magnitude by ~11x on `small_125m`'s largest layers
+#   (see reports/fineweb_bump/). Sweeping the two Moonlight-scaled variants on
+#   the Muon grid (0.005-0.04) produces a sustained dip -> bump -> dip
+#   training-loss pattern at every LR, whereas the same LRs on vanilla Muon
+#   are clean. Moonlight (arXiv:2502.16982 Sec 2.2) recommends reusing AdamW's
+#   LR with the shape constant; we widen that slightly (up to 1e-2) to bracket
+#   the optimum and confirm instability returns above 1e-2.
+#
+# mutrust stays on the Muon grid: once r_max is tightened from 10 to ~1.5 the
+# clipped trust ratio no longer amplifies the LR, so the operating point
+# coincides with vanilla Muon again (see memo in reports/fineweb_bump/).
 #
 # Optimizers       : 6 Muon-family + AdamW + LAMB (same set as CIFAR sweep)
 # Seeds per cell   : 1 (LM runs are expensive; bump to 2-3 for a final pass)
-# Total runs       : (6 * 4 + 2 * 3) * 1 = 30 per config
-#                    With both pilot_25m + small_125m: 60 runs
+# Total runs       : (4 Muon * 4 + 2 Moonlight * 4 + 2 Adam * 3) * 1 = 30 per
+#                    config. With both pilot_25m + small_125m: 60 runs.
 #
 # Usage:
 #   bash scripts/sweep_fineweb_small.sh                   # both configs
@@ -78,14 +87,18 @@ fi
 # Per-family LR grids.
 MUON_LRS=(0.005 0.01 0.02 0.04)
 ADAM_LRS=(3e-4 1e-3 3e-3)
+# Moonlight-scaled Muon variants: widen the AdamW grid by one step upward to
+# bracket the onset of instability (see header comment).
+MOONLIGHT_LRS=(3e-4 1e-3 3e-3 1e-2)
 
-# (optimizer_name, lr_family) where lr_family selects MUON_LRS or ADAM_LRS.
+# (optimizer_name, lr_family) where lr_family selects MUON_LRS, ADAM_LRS, or
+# MOONLIGHT_LRS.
 declare -a JOBS=(
   "muon                    MUON"
-  "muon_moonlight          MUON"
+  "muon_moonlight          MOONLIGHT"
   "orscale_muon            MUON"
   "orscale_muon_wd         MUON"
-  "orscale_muon_moonlight  MUON"
+  "orscale_muon_moonlight  MOONLIGHT"
   "mutrust                 MUON"
   "adamw                   ADAM"
   "lamb                    ADAM"
@@ -125,11 +138,12 @@ fi
 total=0
 for entry in "${SELECTED_JOBS[@]}"; do
   read -r _OPT FAM <<< "$entry"
-  if [[ "$FAM" == "MUON" ]]; then
-    total=$((total + ${#MUON_LRS[@]}))
-  else
-    total=$((total + ${#ADAM_LRS[@]}))
-  fi
+  case "$FAM" in
+    MUON)      total=$((total + ${#MUON_LRS[@]})) ;;
+    ADAM)      total=$((total + ${#ADAM_LRS[@]})) ;;
+    MOONLIGHT) total=$((total + ${#MOONLIGHT_LRS[@]})) ;;
+    *) echo "[error] unknown LR family: $FAM" >&2; exit 1 ;;
+  esac
 done
 total=$((total * SEEDS))
 n_cfg=0
@@ -147,8 +161,9 @@ echo " OrScale FineWeb LM sweep (small)"
 echo "   configs   : $CONFIGS"
 echo "   nproc     : $NPROC (torchrun, sequential DDP runs)"
 echo "   seeds     : $SEEDS (base=$SEED_BASE)"
-echo "   muon lrs  : ${MUON_LRS[*]}"
-echo "   adam lrs  : ${ADAM_LRS[*]}"
+echo "   muon lrs      : ${MUON_LRS[*]}"
+echo "   adam lrs      : ${ADAM_LRS[*]}"
+echo "   moonlight lrs : ${MOONLIGHT_LRS[*]}"
 echo "   optimizers: ${OPTIMIZERS:-all}"
 echo "   dry-run   : $DRY_RUN"
 echo "   total     : $total runs"
@@ -165,11 +180,11 @@ for CONFIG in $CONFIGS; do
 
   for entry in "${SELECTED_JOBS[@]}"; do
     read -r OPT FAM <<< "$entry"
-    if [[ "$FAM" == "MUON" ]]; then
-      LRS=("${MUON_LRS[@]}")
-    else
-      LRS=("${ADAM_LRS[@]}")
-    fi
+    case "$FAM" in
+      MUON)      LRS=("${MUON_LRS[@]}") ;;
+      ADAM)      LRS=("${ADAM_LRS[@]}") ;;
+      MOONLIGHT) LRS=("${MOONLIGHT_LRS[@]}") ;;
+    esac
 
     echo
     echo ">>> [${CFG_STEM}] optimizer=${OPT}  lrs=[${LRS[*]}]"

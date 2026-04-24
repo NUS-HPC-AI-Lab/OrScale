@@ -12,7 +12,7 @@ model:
 
 data:
   name: cifar10
-  root: data/cifar10
+  root: /home/svu/e0572481/scratch/cifar10
   augment: true
   num_workers: 4
   download: true
@@ -24,7 +24,7 @@ training:
   precision: bfloat16
   log_every: 50
   save_every_epoch: 0
-  save_dir: checkpoints/cifar10_davidnet
+  save_dir: /home/svu/e0572481/scratch/checkpoints/cifar10_davidnet
   seed: 42
   label_smoothing: 0.0
 
@@ -34,8 +34,8 @@ optimizer:
   momentum: 0.95
   weight_decay: 5.0e-4
   alpha: 0.5
-  r_min: 0.1
-  r_max: 10.0
+  r_min: 0.5
+  r_max: 1.5
   eps: 1.0e-6
   ns_iters: 5
   adamw_lr: 1.0e-3
@@ -52,5 +52,5 @@ diagnostics:
   heavy_log_every: 500
 
 logging:
-  wandb_project: orscale-vision
+  wandb_project: orscale-vision-cifar10
   wandb_group: cifar10_davidnet

@@ -20,6 +20,19 @@ SRC_DIR="${1:-${IMAGENET_SRC:-/path/to/imagenet_tars}}"
 OUT_DIR="${2:-${IMAGENET_OUT:-/data/imagenet}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ORIG_CWD="$(pwd -P)"
+
+abspath() {
+    python -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$1"
+}
+
+if [[ "$SRC_DIR" != /* ]]; then
+    SRC_DIR="$(cd "$ORIG_CWD" && abspath "$SRC_DIR")"
+fi
+
+if [[ "$OUT_DIR" != /* ]]; then
+    OUT_DIR="$(cd "$ORIG_CWD" && abspath "$OUT_DIR")"
+fi
 
 mkdir -p "$SRC_DIR"
 cd "$SRC_DIR"
