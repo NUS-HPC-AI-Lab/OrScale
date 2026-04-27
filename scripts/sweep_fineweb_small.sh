@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sweep all 6 OrScale memo variants + AdamW + LAMB on FineWeb-Edu (LM) at the
+# Sweep all 7 OrScale memo variants + AdamW + LAMB on FineWeb-Edu (LM) at the
 # "small" scale (configs/small_125m.yaml, optionally configs/pilot_25m.yaml).
 #
 # Hardware target  : 1 node x 4 A100 (single-node DDP, one run at a time).
@@ -28,7 +28,8 @@
 #                                                     orscale_muon_wd)
 #   AdamW / LAMB grid  : {3e-4, 1e-3, 3e-3}          (adamw, lamb)
 #   Moonlight grid     : {3e-4, 1e-3, 3e-3, 5e-3}    (muon_moonlight,
-#                                                     orscale_muon_moonlight)
+#                                                     orscale_muon_moonlight,
+#                                                     muscale)
 #   mutrust grid       : {0.005, 0.01, 0.02}         (mutrust)
 #
 # Why four grids instead of two (history):
@@ -51,11 +52,27 @@
 #   cap and grad-norm clip both saturated post-warmup, so it gets its own
 #   3-cell grid that drops the bad upper edge.
 #
-# Optimizers       : 6 Muon-family + AdamW + LAMB (same set as CIFAR sweep)
+#   Update 2026-04-28 (muscale added):
+#   `muscale` = mutrust trust ratio + Moonlight shape factor 0.2*sqrt(max(m,n)).
+#   Its trust ratio is mathematically identical to mutrust's (RMS form just
+#   cancels the sqrt(mn) factor), but its update is multiplied by the same
+#   shape factor as muon_moonlight / orscale_muon_moonlight, so its effective
+#   per-entry update RMS = 0.2 * eta * r_hat -- the same band as the
+#   Moonlight-grid variants. It therefore goes on the MOONLIGHT_LRS grid
+#   {3e-4, 1e-3, 3e-3, 5e-3}, NOT the mutrust grid: putting it on
+#   {0.005..0.02} would inflate per-entry updates by another ~11x relative to
+#   muon_moonlight's known optimum (1e-3) and reproduce the dip-bump-dip
+#   pattern. The expectation, given orscale_muon_moonlight peaks at 3e-3 with
+#   a near-degenerate trust ratio, is that muscale's optimum lands in
+#   {3e-3, 5e-3} -- with a chance of sliding slightly lower since muscale's
+#   trust ratio is genuinely dynamic (it can clip below 1) where
+#   orscale_muon_moonlight's is pinned near 1.
+#
+# Optimizers       : 7 Muon-family + AdamW + LAMB (same set as CIFAR sweep)
 # Seeds per cell   : 1 (LM runs are expensive; bump to 2-3 for a final pass)
-# Total runs       : (3 Muon * 4 + 2 Moonlight * 4 + 1 Mutrust * 3 +
-#                    2 Adam * 3) * 1 = 29 per config. With both pilot_25m +
-#                    small_125m: 58 runs.
+# Total runs       : (3 Muon * 4 + 3 Moonlight * 4 + 1 Mutrust * 3 +
+#                    2 Adam * 3) * 1 = 33 per config. With both pilot_25m +
+#                    small_125m: 66 runs.
 #
 # Usage:
 #   bash scripts/sweep_fineweb_small.sh                   # both configs
@@ -167,6 +184,7 @@ declare -a JOBS=(
   "orscale_muon_wd         MUON"
   "orscale_muon_moonlight  MOONLIGHT"
   "mutrust                 MUTRUST"
+  "muscale                 MOONLIGHT"
   "adamw                   ADAM"
   "lamb                    ADAM"
 )
@@ -188,7 +206,7 @@ if [[ -n "$OPTIMIZERS" ]]; then
     done
     if [[ "$found" -eq 0 ]]; then
       echo "[error] unknown optimizer in OPTIMIZERS: $requested_opt" >&2
-      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight mutrust adamw lamb" >&2
+      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight mutrust muscale adamw lamb" >&2
       exit 1
     fi
   done

@@ -1,21 +1,29 @@
 #!/usr/bin/env bash
-# Sweep all 6 OrScale memo variants + AdamW + LAMB on CIFAR-10 / DavidNet.
+# Sweep all 7 OrScale memo variants + AdamW + LAMB on CIFAR-10 / DavidNet.
 #
 # Hardware target  : 2 x A100-40G (single node, no DDP).
 #   Each run uses 1 GPU, batch_size=512, matching the Muon blog reference.
 #   sweep.py launches `--parallel 2` runs at a time, assigning CUDA_VISIBLE_DEVICES
 #   per run (logical device 0 inside the child process maps to one physical GPU).
 #
-# Optimizers       : 6 Muon-family + AdamW + LAMB
+# Optimizers       : 7 Muon-family + AdamW + LAMB
 # Per-family LR    : Muon family {0.005, 0.01, 0.02, 0.04}
 #                    AdamW/LAMB  {1e-3, 3e-3, 1e-2}
 # Seeds per cell   : 3
-# Total runs       : (6 * 4 + 2 * 3) * 3 = 90
+# Total runs       : (7 * 4 + 2 * 3) * 3 = 102
 #
-# Why the Moonlight-scaled variants (muon_moonlight, orscale_muon_moonlight)
-# stay on the Muon grid here, unlike sweep_fineweb_small.sh (update
-# 2026-04-22): the `0.2 * sqrt(max(m, n))` shape constant inflates the
-# per-entry update by ~5-14x on DavidNet's largest flattened conv
+# The 7th Muon-family variant is `muscale` (added 2026-04-28): mutrust's
+# trust ratio (||W||_F / ||M_hat||_F, identical to OrScale2's after
+# canceling the sqrt(mn) factor) plus Moonlight's static shape factor
+# 0.2*sqrt(max(m,n)) on the orthogonalized update Q. It is the
+# (dynamic-denominator, shape-scaled) corner of the 2x2 design space
+# spanned by trust-ratio denominator x shape factor, and is the
+# recommended primary OrScale variant in the paper.
+#
+# Why the Moonlight-scaled variants (muon_moonlight, orscale_muon_moonlight,
+# muscale) all stay on the Muon grid here, unlike sweep_fineweb_small.sh
+# (update 2026-04-22): the `0.2 * sqrt(max(m, n))` shape constant inflates
+# the per-entry update by ~5-14x on DavidNet's largest flattened conv
 # (512 x 4608). On FineWeb that same inflation, combined with 20k training
 # steps on a pre-norm transformer, produced a sustained dip -> bump -> dip
 # loss pattern (see reports/fineweb_bump/). On CIFAR the same optimizers
@@ -27,6 +35,11 @@
 #      optimizer peaks *inside* {0.005..0.04} -- no variant wants AdamW-
 #      scale LRs here. Moving them to the AdamW grid would under-sample the
 #      empirical optimum.
+# muscale shares the same shape factor as muon_moonlight and
+# orscale_muon_moonlight, so the same three stabilizers apply and the
+# Muon grid is the right starting point. Both the existing CIFAR optima
+# at lr=0.02 (orscale_muon_moonlight: 94.05; muon_moonlight peak inside
+# 0.005-0.04) suggest muscale's optimum will land in the same band.
 # Re-run once after changing defaults (r_max/r_min tightened to 1.5/0.5 on
 # 2026-04-22) to confirm the optima haven't shifted past 0.04; if any do,
 # widen the Muon grid by adding 0.08 rather than switching to Moonlight LRs.
@@ -73,6 +86,7 @@ declare -a JOBS=(
   "orscale_muon_wd         ${MUON_LRS}"
   "orscale_muon_moonlight  ${MUON_LRS}"
   "mutrust                 ${MUON_LRS}"
+  "muscale                 ${MUON_LRS}"
   "adamw                   ${ADAM_LRS}"
   "lamb                    ${ADAM_LRS}"
 )
