@@ -49,3 +49,4 @@ documents/
 # logs and pbs
 *.log
 *.pbs
+*.o[0-9]*

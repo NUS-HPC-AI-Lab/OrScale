@@ -24,29 +24,38 @@
 #
 # Per-family LR grids (split so each optimizer is swept around its known-good
 # operating point given its effective per-entry update magnitude at nominal LR):
-#   Muon grid          : {0.005, 0.01, 0.02, 0.04}   (Muon, mutrust)
-#   AdamW / LAMB grid  : {3e-4, 1e-3, 3e-3}          (AdamW, LAMB)
-#   Moonlight grid     : {3e-4, 1e-3, 3e-3, 1e-2}    (muon_moonlight,
+#   Muon grid          : {0.005, 0.01, 0.02, 0.04}   (muon, orscale_muon,
+#                                                     orscale_muon_wd)
+#   AdamW / LAMB grid  : {3e-4, 1e-3, 3e-3}          (adamw, lamb)
+#   Moonlight grid     : {3e-4, 1e-3, 3e-3, 5e-3}    (muon_moonlight,
 #                                                     orscale_muon_moonlight)
+#   mutrust grid       : {0.005, 0.01, 0.02}         (mutrust)
 #
-# Why three grids instead of two (update 2026-04-22):
-#   The `0.2 * sqrt(max(m, n))` Moonlight shape-normalization constant inflates
-#   the per-entry update magnitude by ~11x on `small_125m`'s largest layers
-#   (see reports/fineweb_bump/). Sweeping the two Moonlight-scaled variants on
-#   the Muon grid (0.005-0.04) produces a sustained dip -> bump -> dip
-#   training-loss pattern at every LR, whereas the same LRs on vanilla Muon
-#   are clean. Moonlight (arXiv:2502.16982 Sec 2.2) recommends reusing AdamW's
-#   LR with the shape constant; we widen that slightly (up to 1e-2) to bracket
-#   the optimum and confirm instability returns above 1e-2.
+# Why four grids instead of two (history):
+#   Update 2026-04-22: The `0.2 * sqrt(max(m, n))` Moonlight shape-
+#   normalization constant inflates the per-entry update magnitude by ~11x on
+#   `small_125m`'s largest layers (see reports/fineweb_bump/). Sweeping the
+#   two Moonlight-scaled variants on the Muon grid (0.005-0.04) produces a
+#   sustained dip -> bump -> dip training-loss pattern at every LR, whereas
+#   the same LRs on vanilla Muon are clean. Moonlight (arXiv:2502.16982
+#   Sec 2.2) recommends reusing AdamW's LR with the shape constant; we widen
+#   that slightly upward to bracket the onset of instability.
 #
-# mutrust stays on the Muon grid: once r_max is tightened from 10 to ~1.5 the
-# clipped trust ratio no longer amplifies the LR, so the operating point
-# coincides with vanilla Muon again (see memo in reports/fineweb_bump/).
+#   Update 2026-04-28 (post-fix sweep, see reports/fineweb_small/):
+#   With r_max tightened from 10.0 to 1.5 and a global grad_clip_norm of 1.0,
+#   the optima are: muon_moonlight @ lr=1e-3, orscale_muon_moonlight @ 3e-3,
+#   mutrust @ 0.02, all converging within 0.02 nats of muon@0.02 (3.2111).
+#   The Moonlight grid's lr=1e-2 still diverges (val 4.6 vs. 3.23) -- it is
+#   replaced with 5e-3 to give a finer cell between 3e-3 and the divergence
+#   line. mutrust@0.04 reaches a worse basin (val 3.73) with the trust-ratio
+#   cap and grad-norm clip both saturated post-warmup, so it gets its own
+#   3-cell grid that drops the bad upper edge.
 #
 # Optimizers       : 6 Muon-family + AdamW + LAMB (same set as CIFAR sweep)
 # Seeds per cell   : 1 (LM runs are expensive; bump to 2-3 for a final pass)
-# Total runs       : (4 Muon * 4 + 2 Moonlight * 4 + 2 Adam * 3) * 1 = 30 per
-#                    config. With both pilot_25m + small_125m: 60 runs.
+# Total runs       : (3 Muon * 4 + 2 Moonlight * 4 + 1 Mutrust * 3 +
+#                    2 Adam * 3) * 1 = 29 per config. With both pilot_25m +
+#                    small_125m: 58 runs.
 #
 # Usage:
 #   bash scripts/sweep_fineweb_small.sh                   # both configs
@@ -55,6 +64,8 @@
 #   NPROC=8 bash scripts/sweep_fineweb_small.sh           # use 8 GPUs/run
 #   SEEDS=3 bash scripts/sweep_fineweb_small.sh           # 3 seeds per cell
 #   DRY_RUN=1 bash scripts/sweep_fineweb_small.sh         # print only
+#   TARGET_TOKENS_PER_STEP=131072 \
+#     bash scripts/sweep_fineweb_small.sh                 # fixed global batch
 #   OPTIMIZERS="muon,muon_moonlight,orscale_muon" \
 #     bash scripts/sweep_fineweb_small.sh                 # optimizer subset
 #
@@ -76,6 +87,7 @@ SEEDS="${SEEDS:-1}"
 SEED_BASE="${SEED_BASE:-42}"
 DRY_RUN="${DRY_RUN:-0}"
 RDZV_PORT="${RDZV_PORT:-29500}"
+TARGET_TOKENS_PER_STEP="${TARGET_TOKENS_PER_STEP:-131072}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -84,22 +96,77 @@ if [[ ! -d data/fineweb10B ]]; then
   echo "[warn] data/fineweb10B not found. Run: python scripts/prepare_data.py --version 10B"
 fi
 
+compute_grad_accum_for_target() {
+  local config="$1"
+  python - "$config" "$NPROC" "$TARGET_TOKENS_PER_STEP" <<'PY'
+import sys
+
+config_path, nproc_raw, target_raw = sys.argv[1:]
+nproc = int(nproc_raw)
+target = int(target_raw)
+
+def read_section_int(path: str, section_name: str, key_name: str, default: int) -> int:
+    section = None
+    with open(path) as f:
+        for raw_line in f:
+            line = raw_line.split("#", 1)[0].rstrip()
+            if not line.strip():
+                continue
+            if not raw_line.startswith((" ", "\t")) and line.endswith(":"):
+                section = line[:-1].strip()
+                continue
+            if section == section_name:
+                stripped = line.strip()
+                prefix = f"{key_name}:"
+                if stripped.startswith(prefix):
+                    value = stripped[len(prefix):].strip().strip("'\"")
+                    return int(value)
+    return default
+
+seq_len = read_section_int(config_path, "model", "max_seq_len", 1024)
+batch_size = read_section_int(config_path, "training", "batch_size", 32)
+tokens_per_micro_step = batch_size * seq_len * nproc
+
+if target % tokens_per_micro_step != 0:
+    raise SystemExit(
+        f"[error] TARGET_TOKENS_PER_STEP={target} is not divisible by "
+        f"batch_size({batch_size}) * seq_len({seq_len}) * NPROC({nproc}) "
+        f"= {tokens_per_micro_step} for {config_path}"
+    )
+
+grad_accum = target // tokens_per_micro_step
+if grad_accum < 1:
+    raise SystemExit(
+        f"[error] TARGET_TOKENS_PER_STEP={target} is smaller than one "
+        f"micro-step ({tokens_per_micro_step} tokens) for {config_path}"
+    )
+
+print(f"{grad_accum} {tokens_per_micro_step} {target}")
+PY
+}
+
 # Per-family LR grids.
 MUON_LRS=(0.005 0.01 0.02 0.04)
 ADAM_LRS=(3e-4 1e-3 3e-3)
-# Moonlight-scaled Muon variants: widen the AdamW grid by one step upward to
-# bracket the onset of instability (see header comment).
-MOONLIGHT_LRS=(3e-4 1e-3 3e-3 1e-2)
+# Moonlight-scaled Muon variants: widen the AdamW grid one step upward (5e-3)
+# to bracket the optimum found at lr=3e-3 in reports/fineweb_small/. The
+# previous upper edge (1e-2) was confirmed to diverge under the post-fix
+# defaults so it is dropped from the final grid.
+MOONLIGHT_LRS=(3e-4 1e-3 3e-3 5e-3)
+# mutrust uses the lower three cells of the Muon grid: lr=0.04 saturates both
+# r_max=1.5 and the grad-norm clip post-warmup and converges to a worse basin
+# (val 3.73 vs. 3.22 at the optimum), see reports/fineweb_small/.
+MUTRUST_LRS=(0.005 0.01 0.02)
 
-# (optimizer_name, lr_family) where lr_family selects MUON_LRS, ADAM_LRS, or
-# MOONLIGHT_LRS.
+# (optimizer_name, lr_family) where lr_family selects MUON_LRS, ADAM_LRS,
+# MOONLIGHT_LRS, or MUTRUST_LRS.
 declare -a JOBS=(
   "muon                    MUON"
   "muon_moonlight          MOONLIGHT"
   "orscale_muon            MUON"
   "orscale_muon_wd         MUON"
   "orscale_muon_moonlight  MOONLIGHT"
-  "mutrust                 MUON"
+  "mutrust                 MUTRUST"
   "adamw                   ADAM"
   "lamb                    ADAM"
 )
@@ -142,6 +209,7 @@ for entry in "${SELECTED_JOBS[@]}"; do
     MUON)      total=$((total + ${#MUON_LRS[@]})) ;;
     ADAM)      total=$((total + ${#ADAM_LRS[@]})) ;;
     MOONLIGHT) total=$((total + ${#MOONLIGHT_LRS[@]})) ;;
+    MUTRUST)   total=$((total + ${#MUTRUST_LRS[@]})) ;;
     *) echo "[error] unknown LR family: $FAM" >&2; exit 1 ;;
   esac
 done
@@ -160,10 +228,12 @@ echo "============================================================"
 echo " OrScale FineWeb LM sweep (small)"
 echo "   configs   : $CONFIGS"
 echo "   nproc     : $NPROC (torchrun, sequential DDP runs)"
+echo "   target tokens/step : $TARGET_TOKENS_PER_STEP"
 echo "   seeds     : $SEEDS (base=$SEED_BASE)"
 echo "   muon lrs      : ${MUON_LRS[*]}"
 echo "   adam lrs      : ${ADAM_LRS[*]}"
 echo "   moonlight lrs : ${MOONLIGHT_LRS[*]}"
+echo "   mutrust lrs   : ${MUTRUST_LRS[*]}"
 echo "   optimizers: ${OPTIMIZERS:-all}"
 echo "   dry-run   : $DRY_RUN"
 echo "   total     : $total runs"
@@ -177,6 +247,12 @@ for CONFIG in $CONFIGS; do
     exit 1
   fi
   CFG_STEM="$(basename "${CONFIG%.yaml}")"
+  read -r GRAD_ACCUM_STEPS TOKENS_PER_MICRO_STEP EFFECTIVE_TOKENS_PER_STEP < <(
+    compute_grad_accum_for_target "$CONFIG"
+  )
+
+  echo
+  echo ">>> [${CFG_STEM}] fixed batch: micro-step=${TOKENS_PER_MICRO_STEP} tokens, grad_accum=${GRAD_ACCUM_STEPS}, effective=${EFFECTIVE_TOKENS_PER_STEP} tokens/step"
 
   for entry in "${SELECTED_JOBS[@]}"; do
     read -r OPT FAM <<< "$entry"
@@ -184,6 +260,7 @@ for CONFIG in $CONFIGS; do
       MUON)      LRS=("${MUON_LRS[@]}") ;;
       ADAM)      LRS=("${ADAM_LRS[@]}") ;;
       MOONLIGHT) LRS=("${MOONLIGHT_LRS[@]}") ;;
+      MUTRUST)   LRS=("${MUTRUST_LRS[@]}") ;;
     esac
 
     echo
@@ -210,6 +287,7 @@ for CONFIG in $CONFIGS; do
           "optimizer.name=${OPT}"
           "optimizer.lr=${LR}"
           "training.seed=${SEED}"
+          "training.grad_accum_steps=${GRAD_ACCUM_STEPS}"
         )
 
         if [[ "$DRY_RUN" == "1" ]]; then
