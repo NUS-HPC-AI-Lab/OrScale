@@ -16,6 +16,10 @@ Sorted by `final_val_loss` (mean of last 3 logged val checkpoints).
 | old | muon_moonlight | 0.01 | 4.6406 | 4.6690 | 4.4868 | YES | - | - |
 | old | muon_moonlight | 0.02 | 4.7244 | 4.7518 | 4.7513 | YES | - | - |
 | old | muon_moonlight | 0.04 | 4.8954 | 4.9272 | 4.9263 | YES | - | - |
+| new | muscale | 1e-3 | 3.3174 | 3.3015 | 3.3013 | no | 0.294 | 0.000 |
+| new | muscale | 3e-3 | 4.4742 | 4.4914 | 4.2574 | YES | 7.119 | 1.000 |
+| new | muscale | 3e-4 | 3.3443 | 3.3276 | 3.3274 | no | 0.413 | 0.010 |
+| new | muscale | 5e-3 | 4.7576 | 4.7883 | 4.4940 | YES | 13.267 | 0.985 |
 | new | mutrust | 0.005 | 3.2418 | 3.2339 | 3.2337 | no | 0.264 | 0.000 |
 | new | mutrust | 0.01 | 3.2290 | 3.2215 | 3.2212 | no | 0.289 | 0.000 |
 | new | mutrust | 0.02 | 3.2238 | 3.2164 | 3.2160 | no | 0.360 | 0.038 |

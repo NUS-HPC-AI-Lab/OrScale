@@ -7,8 +7,12 @@
 #   per run (logical device 0 inside the child process maps to one physical GPU).
 #
 # Optimizers       : 7 Muon-family + AdamW + LAMB
-# Per-family LR    : Muon family {0.005, 0.01, 0.02, 0.04}
-#                    AdamW/LAMB  {1e-3, 3e-3, 1e-2}
+# Per-family LR    : Muon family {0.005, 0.01, 0.02, 0.04} for six variants
+#                    (muon, muon_moonlight, orscale_muon, orscale_muon_wd,
+#                    orscale_muon_moonlight, mutrust)
+#                    muscale       {0.04, 0.06, 0.08, 0.12} (follow-up grid;
+#                    override with MUSCALE_LRS=...)
+#                    AdamW/LAMB    {1e-3, 3e-3, 1e-2}
 # Seeds per cell   : 3
 # Total runs       : (7 * 4 + 2 * 3) * 3 = 102
 #
@@ -20,8 +24,8 @@
 # spanned by trust-ratio denominator x shape factor, and is the
 # recommended primary OrScale variant in the paper.
 #
-# Why the Moonlight-scaled variants (muon_moonlight, orscale_muon_moonlight,
-# muscale) all stay on the Muon grid here, unlike sweep_fineweb_small.sh
+# Why the Moonlight-scaled variants (muon_moonlight, orscale_muon_moonlight)
+# stay on the Muon grid here, unlike sweep_fineweb_small.sh
 # (update 2026-04-22): the `0.2 * sqrt(max(m, n))` shape constant inflates
 # the per-entry update by ~5-14x on DavidNet's largest flattened conv
 # (512 x 4608). On FineWeb that same inflation, combined with 20k training
@@ -37,17 +41,20 @@
 #      empirical optimum.
 # muscale shares the same shape factor as muon_moonlight and
 # orscale_muon_moonlight, so the same three stabilizers apply and the
-# Muon grid is the right starting point. Both the existing CIFAR optima
-# at lr=0.02 (orscale_muon_moonlight: 94.05; muon_moonlight peak inside
-# 0.005-0.04) suggest muscale's optimum will land in the same band.
-# Re-run once after changing defaults (r_max/r_min tightened to 1.5/0.5 on
-# 2026-04-22) to confirm the optima haven't shifted past 0.04; if any do,
-# widen the Muon grid by adding 0.08 rather than switching to Moonlight LRs.
+# Muon grid was the right *first* sweep. The 2026-04-29 muscale-only
+# results (reports/cifar10_davidnet/report_appendix.md) show the best
+# cell at lr=0.04 on the boundary of {0.005..0.04} with a flat surface
+# (93.56-93.75% across the grid). The follow-up grid widens **upward**
+# only: {0.04, 0.06, 0.08, 0.12}. Override at launch time with
+# `MUSCALE_LRS=0.04,0.05,0.06` if you want a custom bracket.
 #
 # Usage:
 #   bash scripts/sweep_cifar10.sh                 # full sweep
 #   DRY_RUN=1 bash scripts/sweep_cifar10.sh       # print runs without launching
 #   PARALLEL=1 bash scripts/sweep_cifar10.sh      # force sequential (e.g. 1 GPU)
+#   OPTIMIZERS="muscale" \
+#     bash scripts/sweep_cifar10.sh               # optimizer subset (comma- or
+#                                                 # space-separated)
 #
 # Notes:
 #   - Run from the repo root.
@@ -77,6 +84,7 @@ fi
 
 # (optimizer_name, comma-separated LR list)
 MUON_LRS="0.005,0.01,0.02,0.04"
+MUSCALE_LRS="${MUSCALE_LRS:-0.04,0.06,0.08,0.12}"
 ADAM_LRS="0.001,0.003,0.01"
 
 declare -a JOBS=(
@@ -86,20 +94,51 @@ declare -a JOBS=(
   "orscale_muon_wd         ${MUON_LRS}"
   "orscale_muon_moonlight  ${MUON_LRS}"
   "mutrust                 ${MUON_LRS}"
-  "muscale                 ${MUON_LRS}"
+  "muscale                 ${MUSCALE_LRS}"
   "adamw                   ${ADAM_LRS}"
   "lamb                    ${ADAM_LRS}"
 )
 
+OPTIMIZERS="${OPTIMIZERS:-}"
+declare -a SELECTED_JOBS=()
+if [[ -n "$OPTIMIZERS" ]]; then
+  # Accept comma- or space-separated names, e.g. "muon,adamw" or "muon adamw".
+  normalized_optimizers="${OPTIMIZERS//,/ }"
+  for requested_opt in $normalized_optimizers; do
+    found=0
+    for entry in "${JOBS[@]}"; do
+      read -r opt_name _lrs <<< "$entry"
+      if [[ "$opt_name" == "$requested_opt" ]]; then
+        SELECTED_JOBS+=("$entry")
+        found=1
+        break
+      fi
+    done
+    if [[ "$found" -eq 0 ]]; then
+      echo "[error] unknown optimizer in OPTIMIZERS: $requested_opt" >&2
+      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight mutrust muscale adamw lamb" >&2
+      exit 1
+    fi
+  done
+else
+  SELECTED_JOBS=("${JOBS[@]}")
+fi
+
+if [[ "${#SELECTED_JOBS[@]}" -eq 0 ]]; then
+  echo "[error] no optimizers selected." >&2
+  exit 1
+fi
+
 echo "==============================================="
 echo " OrScale CIFAR-10 sweep"
-echo "   config   : $CONFIG"
-echo "   parallel : $PARALLEL"
-echo "   seeds    : $SEEDS"
-echo "   dry-run  : $DRY_RUN"
+echo "   config     : $CONFIG"
+echo "   parallel   : $PARALLEL"
+echo "   seeds      : $SEEDS"
+echo "   optimizers : ${OPTIMIZERS:-all}"
+echo "   dry-run    : $DRY_RUN"
 echo "==============================================="
 
-for entry in "${JOBS[@]}"; do
+for entry in "${SELECTED_JOBS[@]}"; do
   read -r OPT LRS <<< "$entry"
   echo
   echo ">>> Sweeping optimizer=${OPT}  lrs=[${LRS}]"

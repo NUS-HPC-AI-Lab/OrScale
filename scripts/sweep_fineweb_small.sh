@@ -12,8 +12,9 @@
 #   - Llama-style dense models, Muon family vs AdamW scaling-law sweep.
 #   - Smallest scaling-law cell: 399M params, 12L / hidden 1536, 8.92B tokens,
 #     LR=9.503e-4, batch size 96 (in 8K context = ~786K tokens/step). Our 125M
-#     run uses ~131K tokens/step (32 * 1024 * 4 grad-accum), so the AdamW
-#     optimum is expected to land in the same ~3e-4 to ~3e-3 band.
+#     run uses ~131K tokens/step by default (32 * 1024 * NPROC * grad_accum);
+#     set TARGET_TOKENS_PER_STEP=262144 for ~262K tokens/step (e.g. muscale
+#     PBS job parity with other cluster sweeps).
 #   - Momentum 0.95, Newton-Schulz iters = 5 (paper Sec 2.2; matches
 #     OrScale defaults).
 #   - Weight decay: paper uses 0.1 in scaling-law and Moonlight pretraining;
@@ -28,8 +29,10 @@
 #                                                     orscale_muon_wd)
 #   AdamW / LAMB grid  : {3e-4, 1e-3, 3e-3}          (adamw, lamb)
 #   Moonlight grid     : {3e-4, 1e-3, 3e-3, 5e-3}    (muon_moonlight,
-#                                                     orscale_muon_moonlight,
-#                                                     muscale)
+#                                                     orscale_muon_moonlight)
+#   muscale grid       : {1e-4, 3e-4, 5e-4, 1e-3}    (muscale only -- denser
+#                                                     low-LR bracket per
+#                                                     reports/fineweb_small/)
 #   mutrust grid       : {0.005, 0.01, 0.02}         (mutrust)
 #
 # Why four grids instead of two (history):
@@ -52,25 +55,23 @@
 #   cap and grad-norm clip both saturated post-warmup, so it gets its own
 #   3-cell grid that drops the bad upper edge.
 #
-#   Update 2026-04-28 (muscale added):
+#   Update 2026-04-29 (muscale FineWeb re-grid):
+#   First muscale sweep on {3e-4, 1e-3, 3e-3, 5e-3} showed clean runs only on
+#   the lower half; 3e-3/5e-3 dip-bump-diverge with grad clip saturated. Best
+#   at 1e-3. muscale now uses a dedicated MUSCALE_LRS {1e-4, 3e-4, 5e-4, 1e-3}
+#   (not the Moonlight grid shared with muon_moonlight / orscale_muon_moonlight).
+#
+#   Update 2026-04-28 (muscale added, superseded for LR grid by 2026-04-29):
 #   `muscale` = mutrust trust ratio + Moonlight shape factor 0.2*sqrt(max(m,n)).
 #   Its trust ratio is mathematically identical to mutrust's (RMS form just
 #   cancels the sqrt(mn) factor), but its update is multiplied by the same
 #   shape factor as muon_moonlight / orscale_muon_moonlight, so its effective
-#   per-entry update RMS = 0.2 * eta * r_hat -- the same band as the
-#   Moonlight-grid variants. It therefore goes on the MOONLIGHT_LRS grid
-#   {3e-4, 1e-3, 3e-3, 5e-3}, NOT the mutrust grid: putting it on
-#   {0.005..0.02} would inflate per-entry updates by another ~11x relative to
-#   muon_moonlight's known optimum (1e-3) and reproduce the dip-bump-dip
-#   pattern. The expectation, given orscale_muon_moonlight peaks at 3e-3 with
-#   a near-degenerate trust ratio, is that muscale's optimum lands in
-#   {3e-3, 5e-3} -- with a chance of sliding slightly lower since muscale's
-#   trust ratio is genuinely dynamic (it can clip below 1) where
-#   orscale_muon_moonlight's is pinned near 1.
+#   per-entry update RMS is in the Moonlight band. The first sweep used the
+#   shared Moonlight LRs; the dedicated grid above reflects empirical results.
 #
 # Optimizers       : 7 Muon-family + AdamW + LAMB (same set as CIFAR sweep)
 # Seeds per cell   : 1 (LM runs are expensive; bump to 2-3 for a final pass)
-# Total runs       : (3 Muon * 4 + 3 Moonlight * 4 + 1 Mutrust * 3 +
+# Total runs       : (3 Muon * 4 + 2 Moonlight * 4 + 1 muscale * 4 + 1 Mutrust * 3 +
 #                    2 Adam * 3) * 1 = 33 per config. With both pilot_25m +
 #                    small_125m: 66 runs.
 #
@@ -81,8 +82,8 @@
 #   NPROC=8 bash scripts/sweep_fineweb_small.sh           # use 8 GPUs/run
 #   SEEDS=3 bash scripts/sweep_fineweb_small.sh           # 3 seeds per cell
 #   DRY_RUN=1 bash scripts/sweep_fineweb_small.sh         # print only
-#   TARGET_TOKENS_PER_STEP=131072 \
-#     bash scripts/sweep_fineweb_small.sh                 # fixed global batch
+#   TARGET_TOKENS_PER_STEP=262144 \
+#     bash scripts/sweep_fineweb_small.sh                 # align with full-batch other sweeps (2x 131072)
 #   OPTIMIZERS="muon,muon_moonlight,orscale_muon" \
 #     bash scripts/sweep_fineweb_small.sh                 # optimizer subset
 #
@@ -105,6 +106,8 @@ SEED_BASE="${SEED_BASE:-42}"
 DRY_RUN="${DRY_RUN:-0}"
 RDZV_PORT="${RDZV_PORT:-29500}"
 TARGET_TOKENS_PER_STEP="${TARGET_TOKENS_PER_STEP:-131072}"
+# 131072 = 2 * (batch * seq * nproc) with small_125m @ NPROC=2; use 262144
+# (4x micro-step) to match other optimizers' effective batch in cluster jobs.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -170,13 +173,15 @@ ADAM_LRS=(3e-4 1e-3 3e-3)
 # previous upper edge (1e-2) was confirmed to diverge under the post-fix
 # defaults so it is dropped from the final grid.
 MOONLIGHT_LRS=(3e-4 1e-3 3e-3 5e-3)
+# muscale: denser bracket below 1e-3 (see reports/fineweb_small/ 2026-04-29).
+MUSCALE_LRS=(1e-4 3e-4 5e-4 1e-3)
 # mutrust uses the lower three cells of the Muon grid: lr=0.04 saturates both
 # r_max=1.5 and the grad-norm clip post-warmup and converges to a worse basin
 # (val 3.73 vs. 3.22 at the optimum), see reports/fineweb_small/.
 MUTRUST_LRS=(0.005 0.01 0.02)
 
 # (optimizer_name, lr_family) where lr_family selects MUON_LRS, ADAM_LRS,
-# MOONLIGHT_LRS, or MUTRUST_LRS.
+# MOONLIGHT_LRS, MUSCALE_LRS, or MUTRUST_LRS.
 declare -a JOBS=(
   "muon                    MUON"
   "muon_moonlight          MOONLIGHT"
@@ -184,7 +189,7 @@ declare -a JOBS=(
   "orscale_muon_wd         MUON"
   "orscale_muon_moonlight  MOONLIGHT"
   "mutrust                 MUTRUST"
-  "muscale                 MOONLIGHT"
+  "muscale                 MUSCALE"
   "adamw                   ADAM"
   "lamb                    ADAM"
 )
@@ -227,6 +232,7 @@ for entry in "${SELECTED_JOBS[@]}"; do
     MUON)      total=$((total + ${#MUON_LRS[@]})) ;;
     ADAM)      total=$((total + ${#ADAM_LRS[@]})) ;;
     MOONLIGHT) total=$((total + ${#MOONLIGHT_LRS[@]})) ;;
+    MUSCALE)   total=$((total + ${#MUSCALE_LRS[@]})) ;;
     MUTRUST)   total=$((total + ${#MUTRUST_LRS[@]})) ;;
     *) echo "[error] unknown LR family: $FAM" >&2; exit 1 ;;
   esac
@@ -251,6 +257,7 @@ echo "   seeds     : $SEEDS (base=$SEED_BASE)"
 echo "   muon lrs      : ${MUON_LRS[*]}"
 echo "   adam lrs      : ${ADAM_LRS[*]}"
 echo "   moonlight lrs : ${MOONLIGHT_LRS[*]}"
+echo "   muscale lrs   : ${MUSCALE_LRS[*]}"
 echo "   mutrust lrs   : ${MUTRUST_LRS[*]}"
 echo "   optimizers: ${OPTIMIZERS:-all}"
 echo "   dry-run   : $DRY_RUN"
@@ -278,6 +285,7 @@ for CONFIG in $CONFIGS; do
       MUON)      LRS=("${MUON_LRS[@]}") ;;
       ADAM)      LRS=("${ADAM_LRS[@]}") ;;
       MOONLIGHT) LRS=("${MOONLIGHT_LRS[@]}") ;;
+      MUSCALE)   LRS=("${MUSCALE_LRS[@]}") ;;
       MUTRUST)   LRS=("${MUTRUST_LRS[@]}") ;;
     esac
 

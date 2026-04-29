@@ -45,7 +45,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # Optimizer families we care about (flagged + controls).
-FLAGGED = ("mutrust", "orscale_muon_moonlight", "muon_moonlight")
+# ``muscale`` was added on 2026-04-29 as a fourth flagged optimizer (Nesterov +
+# RMS(M_hat) denominator + Moonlight shape norm) -- it has the same Moonlight-
+# style shape rescaling that previously required widening the LR grid downward,
+# so we expect it to need the same diagnostic treatment as the original three.
+FLAGGED = ("mutrust", "orscale_muon_moonlight", "muon_moonlight", "muscale")
 CONTROLS = ("muon", "adamw")
 TARGET_OPTS = FLAGGED + CONTROLS
 

@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """Analyze the CIFAR-10 / DavidNet optimizer sweep.
 
-Parses every per-run log under a directory structured like
+Parses every per-run log under one or more roots structured like
 
     sweeps/cifar10_sweeps/
         <timestamp>/
             name=<optimizer>_lr=<lr>_seed=<seed>.log
             sweep_config.json
 
-produced by `scripts/sweep_cifar10.sh`, and emits:
+produced by `scripts/sweep_cifar10.sh`. Each root may either be a parent of
+timestamped sweep subdirs (canonical) or a single sweep dir whose ``.log``
+files match the same naming pattern -- both layouts are merged transparently.
+The default ``--sweeps-dir`` covers both ``sweeps/cifar10_sweeps`` (the
+original 8-optimizer comparison) and ``sweeps/20260429_023319`` (the
+follow-up muscale sweep). Emits:
 
     reports/cifar10_davidnet/
         runs.csv                 -- one row per run (aggregate metrics)
@@ -163,14 +168,35 @@ def parse_log_file(path: Path) -> Optional[RunLog]:
 
 
 def collect_runs(sweeps_dir: Path) -> List[RunLog]:
+    """Parse runs under ``sweeps_dir``.
+
+    Two layouts are supported in the same call:
+
+    1. ``sweeps_dir/<timestamp>/name=*_lr=*_seed=*.log`` -- the canonical
+       layout produced by ``scripts/sweep_cifar10.sh`` (one timestamped
+       subdir per (optimizer, lr, seed) sweep batch).
+    2. ``sweeps_dir/name=*_lr=*_seed=*.log`` -- a single sweep batch passed
+       in directly as the sweep dir.
+
+    The recursive ``rglob`` matches both transparently.
+    """
     runs: List[RunLog] = []
-    for child in sorted(sweeps_dir.iterdir()):
-        if not child.is_dir():
-            continue
-        for log in sorted(child.glob("name=*_lr=*_seed=*.log")):
-            r = parse_log_file(log)
-            if r is not None:
-                runs.append(r)
+    for log in sorted(sweeps_dir.rglob("name=*_lr=*_seed=*.log")):
+        r = parse_log_file(log)
+        if r is not None:
+            runs.append(r)
+    return runs
+
+
+def collect_runs_many(sweeps_dirs: Iterable[Path]) -> List[RunLog]:
+    seen_paths: set[str] = set()
+    runs: List[RunLog] = []
+    for d in sweeps_dirs:
+        for r in collect_runs(d):
+            if r.log_path in seen_paths:
+                continue
+            seen_paths.add(r.log_path)
+            runs.append(r)
     return runs
 
 
@@ -242,7 +268,7 @@ def write_markdown_table(path: Path, headers: List[str], rows: List[List[str]], 
 # Plotting
 # ---------------------------------------------------------------------------
 
-# Stable color assignment for the 8 optimizers.
+# Stable color assignment for the 9 optimizers.
 OPT_COLORS: Dict[str, str] = {
     "muon":                    "#1f77b4",
     "muon_moonlight":          "#17becf",
@@ -250,6 +276,7 @@ OPT_COLORS: Dict[str, str] = {
     "orscale_muon_wd":         "#e377c2",
     "orscale_muon_moonlight":  "#ff7f0e",
     "mutrust":                 "#9467bd",
+    "muscale":                 "#bcbd22",
     "adamw":                   "#2ca02c",
     "lamb":                    "#8c564b",
 }
@@ -647,6 +674,13 @@ def write_report(
     summary_opt_lr: List[dict],
     best_lr: Dict[str, dict],
 ) -> None:
+    """Emit ``report.md``.
+
+    If a sibling file ``report_appendix.md`` exists in ``out_dir``, its
+    contents are appended verbatim to the end of the auto-generated report.
+    This lets a hand-written narrative (e.g. an optimizer-family deep dive)
+    survive re-runs of the analysis pipeline without being overwritten.
+    """
     lines: List[str] = []
     lines.append("# CIFAR-10 / DavidNet optimizer sweep — analysis report")
     lines.append("")
@@ -712,6 +746,13 @@ def write_report(
     lines.append("- Raw tidy data: `runs.csv`, `epochs.csv`, `steps.csv`")
     lines.append("")
 
+    appendix_path = out_dir / "report_appendix.md"
+    if appendix_path.exists():
+        appendix = appendix_path.read_text().rstrip()
+        if appendix:
+            lines.append(appendix)
+            lines.append("")
+
     (out_dir / "report.md").write_text("\n".join(lines) + "\n")
 
 
@@ -721,8 +762,17 @@ def main() -> None:
     ap.add_argument(
         "--sweeps-dir",
         type=Path,
-        default=repo_root / "sweeps" / "cifar10_sweeps",
-        help="Directory containing <timestamp>/ subdirs with per-run .log files.",
+        nargs="+",
+        default=[
+            repo_root / "sweeps" / "cifar10_sweeps",
+            repo_root / "sweeps" / "20260429_023319",
+        ],
+        help=(
+            "One or more roots to scan recursively for "
+            "name=<opt>_lr=<lr>_seed=<seed>.log files. Each root may be "
+            "either a parent of timestamped sweep subdirs (the canonical "
+            "layout) or a single sweep dir; both layouts are merged."
+        ),
     )
     ap.add_argument(
         "--out-dir",
@@ -743,7 +793,9 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    sweeps_dir: Path = args.sweeps_dir
+    sweeps_dirs: List[Path] = (
+        args.sweeps_dir if isinstance(args.sweeps_dir, list) else [args.sweeps_dir]
+    )
     out_dir: Path = args.out_dir
     headline: str = args.headline
     headline_label = {
@@ -752,11 +804,14 @@ def main() -> None:
         "best": "best observed",
     }[headline]
 
-    if not sweeps_dir.exists():
-        raise SystemExit(f"sweeps dir not found: {sweeps_dir}")
+    missing = [d for d in sweeps_dirs if not d.exists()]
+    if missing:
+        raise SystemExit(
+            "sweeps dir(s) not found: " + ", ".join(str(d) for d in missing)
+        )
 
-    print(f"[info] Scanning sweeps: {sweeps_dir}")
-    runs = collect_runs(sweeps_dir)
+    print(f"[info] Scanning sweeps: {', '.join(str(d) for d in sweeps_dirs)}")
+    runs = collect_runs_many(sweeps_dirs)
     if not runs:
         raise SystemExit("No runs found. Check --sweeps-dir layout.")
     print(f"[info] Parsed {len(runs)} runs "

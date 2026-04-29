@@ -17,13 +17,21 @@ variants downward by ~10x, (2) tightening ``r_max``/``r_min`` from
   Q4. Is the global grad-norm clip firing constantly (i.e. is the new effective
       LR set by the clip rather than by the schedule)?
 
+A fourth flagged optimizer ``muscale`` was added on 2026-04-29 (sweep
+``sweeps/fineweb_20260429_024537``). It uses the same post-fix defaults
+(``r_min=0.5``, ``r_max=1.5``, ``grad_clip_norm=1.0``) and is treated as a
+new (post-fix) optimizer with no pre-fix counterpart -- the before/after
+panel is therefore skipped for it.
+
 Inputs:
     --new-sweeps          : sweep dirs containing post-fix runs
                             (default: sweeps/fineweb_20260427_014028,
-                                      sweeps/fineweb_20260427_061908)
+                                      sweeps/fineweb_20260427_061908,
+                                      sweeps/fineweb_20260429_024537)
     --baseline-sweep      : dir containing the ``muon`` baseline runs
                             (default: sweeps/fineweb_20260421_034858)
-    --old-flagged-sweeps  : pre-fix sweep dirs for the three flagged optimizers
+    --old-flagged-sweeps  : pre-fix sweep dirs for the original three flagged
+                            optimizers (no pre-fix sweep for muscale)
                             (default: sweeps/fineweb_20260421_034858,
                                       sweeps/fineweb_20260421_035149)
 
@@ -59,8 +67,15 @@ from analyze_fineweb_bump import (
 )
 
 
-# Optimizers we want side-by-side in the post-fix comparison.
-FLAGGED = ("muon_moonlight", "orscale_muon_moonlight", "mutrust")
+# Optimizers we want side-by-side in the post-fix comparison. ``muscale`` was
+# added on 2026-04-29 as a fourth flagged optimizer once a dedicated sweep
+# came in: it shares Moonlight's shape rescaling and exhibits the same dip->
+# bump->dip pathology at the upper end of the original Muon LR grid (see
+# ``reports/fineweb_bump_muscale/`` for the bump-detection summary on the new
+# sweep). It does not have any *pre-fix* runs to compare against, so the
+# before/after panel is skipped for it.
+FLAGGED = ("muon_moonlight", "orscale_muon_moonlight", "mutrust", "muscale")
+FLAGGED_WITH_BEFORE_AFTER = ("muon_moonlight", "orscale_muon_moonlight", "mutrust")
 BASELINE = "muon"
 TARGET_OPTS = (BASELINE,) + FLAGGED
 
@@ -245,8 +260,11 @@ def plot_before_after(
     LRs differ between old and new for the Moonlight pair, so we don't try to
     color-match -- old is grey, new is viridis. The point of the plot is "no
     bump on any new curve, vs the old curves all bumping".
+
+    Skipped for any flagged optimizer that does not have pre-fix runs (e.g.
+    ``muscale``, which only has a post-fix sweep).
     """
-    for opt in FLAGGED:
+    for opt in FLAGGED_WITH_BEFORE_AFTER:
         old = [r for r in runs_old if r["opt"] == opt]
         new = [r for r in runs_new if r["opt"] == opt]
         if not (old and new):
@@ -318,6 +336,7 @@ def plot_best_lr_comparison(
         "muon_moonlight": "tab:blue",
         "orscale_muon_moonlight": "tab:green",
         "mutrust": "tab:red",
+        "muscale": "tab:orange",
     }
     for series_key, ylabel in (("train", "Train loss"), ("val", "Val loss")):
         fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -478,6 +497,10 @@ def main():
         default=[
             Path("sweeps/fineweb_20260427_014028"),
             Path("sweeps/fineweb_20260427_061908"),
+            # muscale-only follow-up sweep (2026-04-29). Same fix bundle is
+            # in effect (r_min=0.5, r_max=1.5, grad_clip=1.0) so this is
+            # treated as a "new" / post-fix sweep.
+            Path("sweeps/fineweb_20260429_024537"),
         ],
     )
     ap.add_argument(
