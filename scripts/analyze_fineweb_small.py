@@ -17,8 +17,9 @@ variants downward by ~10x, (2) tightening ``r_max``/``r_min`` from
   Q4. Is the global grad-norm clip firing constantly (i.e. is the new effective
       LR set by the clip rather than by the schedule)?
 
-A fourth flagged optimizer ``muscale`` was added on 2026-04-29 (sweep
-``sweeps/fineweb_20260429_024537``). It uses the same post-fix defaults
+A fourth flagged optimizer ``muscale`` was added on 2026-04-29. The latest
+report uses the low-LR follow-up sweep ``sweeps/fineweb_20260429_120914``.
+It uses the same post-fix defaults
 (``r_min=0.5``, ``r_max=1.5``, ``grad_clip_norm=1.0``) and is treated as a
 new (post-fix) optimizer with no pre-fix counterpart -- the before/after
 panel is therefore skipped for it.
@@ -27,7 +28,7 @@ Inputs:
     --new-sweeps          : sweep dirs containing post-fix runs
                             (default: sweeps/fineweb_20260427_014028,
                                       sweeps/fineweb_20260427_061908,
-                                      sweeps/fineweb_20260429_024537)
+                                      sweeps/fineweb_20260429_120914)
     --baseline-sweep      : dir containing the ``muon`` baseline runs
                             (default: sweeps/fineweb_20260421_034858)
     --old-flagged-sweeps  : pre-fix sweep dirs for the original three flagged
@@ -40,7 +41,7 @@ Outputs (under ``reports/fineweb_small/``):
     summary_by_opt_lr.md       Markdown leaderboard.
     train_loss__<opt>.png      Per-optimizer LR overlay (post-fix).
     val_loss__<opt>.png        Same, validation.
-    grid__train_loss.png       Side-by-side small multiples for the four optimizers.
+    grid__train_loss.png       Side-by-side small multiples for the five optimizers.
     grid__val_loss.png         Same, validation.
     before_after__<opt>.png    Train-loss before/after the fix for each flagged opt.
     best_lr_comparison.png     Best LR per optimizer overlaid against muon@best.
@@ -469,6 +470,12 @@ def write_summary(
 
 def write_leaderboard(rows: list[dict], out_md: Path) -> None:
     """Markdown leaderboard sorted by final val loss within each optimizer."""
+    def lr_value(row: dict) -> float:
+        try:
+            return float(row["lr"])
+        except (TypeError, ValueError):
+            return math.inf
+
     lines = [
         "# FineWeb-Edu small_125m: post-fix sweep leaderboard",
         "",
@@ -478,7 +485,7 @@ def write_leaderboard(rows: list[dict], out_md: Path) -> None:
         " bump | grad_post_warmup_mean | grad_post_warmup_sat_frac |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
-    for r in sorted(rows, key=lambda x: (x["opt"], x["tag"], x["lr"])):
+    for r in sorted(rows, key=lambda x: (x["opt"], x["tag"], lr_value(x))):
         lines.append(
             f"| {r['tag']} | {r['opt']} | {r['lr']} | "
             f"{r['final_train_loss']} | {r['final_val_loss']} | "
@@ -500,7 +507,7 @@ def main():
             # muscale-only follow-up sweep (2026-04-29). Same fix bundle is
             # in effect (r_min=0.5, r_max=1.5, grad_clip=1.0) so this is
             # treated as a "new" / post-fix sweep.
-            Path("sweeps/fineweb_20260429_024537"),
+            Path("sweeps/fineweb_20260429_120914"),
         ],
     )
     ap.add_argument(

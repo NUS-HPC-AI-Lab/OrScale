@@ -12,7 +12,7 @@ produced by `scripts/sweep_cifar10.sh`. Each root may either be a parent of
 timestamped sweep subdirs (canonical) or a single sweep dir whose ``.log``
 files match the same naming pattern -- both layouts are merged transparently.
 The default ``--sweeps-dir`` covers both ``sweeps/cifar10_sweeps`` (the
-original 8-optimizer comparison) and ``sweeps/20260429_023319`` (the
+original 8-optimizer comparison) and ``sweeps/20260429_115704`` (the latest
 follow-up muscale sweep). Emits:
 
     reports/cifar10_davidnet/
@@ -765,7 +765,7 @@ def main() -> None:
         nargs="+",
         default=[
             repo_root / "sweeps" / "cifar10_sweeps",
-            repo_root / "sweeps" / "20260429_023319",
+            repo_root / "sweeps" / "20260429_115704",
         ],
         help=(
             "One or more roots to scan recursively for "
