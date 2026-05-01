@@ -95,12 +95,8 @@ def fit_power_law(
     """
     try:
         import numpy as np
-        from scipy.optimize import curve_fit
     except ImportError as err:
-        raise ImportError(
-            "scipy and numpy are required for scaling-law fits. "
-            "pip install scipy numpy"
-        ) from err
+        raise ImportError("numpy is required for scaling-law fits. pip install numpy") from err
 
     xs = np.asarray(xs, dtype=float)
     ys = np.asarray(ys, dtype=float)
@@ -108,17 +104,69 @@ def fit_power_law(
         raise ValueError("Need at least 2 matched (x, y) points to fit a power law.")
 
     if include_offset:
-        def model(x, A, alpha, offset):
-            return A * np.power(x, alpha) + offset
-        p0 = (float(ys.max()), float(initial_alpha), float(ys.min() * 0.9))
-        popt, _ = curve_fit(model, xs, ys, p0=p0, maxfev=20_000)
-        return PowerLawFit(A=float(popt[0]), alpha=float(popt[1]), offset=float(popt[2]))
+        try:
+            from scipy.optimize import curve_fit
+
+            def model(x, A, alpha, offset):
+                return A * np.power(x, alpha) + offset
+
+            p0 = (float(ys.max()), float(initial_alpha), float(ys.min() * 0.9))
+            popt, _ = curve_fit(model, xs, ys, p0=p0, maxfev=20_000)
+            return PowerLawFit(A=float(popt[0]), alpha=float(popt[1]), offset=float(popt[2]))
+        except ImportError:
+            return _fit_power_law_offset_numpy(xs, ys)
 
     # Log-log linear fit: log y = log A + alpha * log x.
     log_x = np.log(xs)
     log_y = np.log(ys)
     alpha, log_A = np.polyfit(log_x, log_y, 1)
     return PowerLawFit(A=float(math.exp(log_A)), alpha=float(alpha))
+
+
+def _fit_power_law_offset_numpy(xs, ys) -> PowerLawFit:
+    """Fit ``A * x^alpha + offset`` with a 1D NumPy-only offset search."""
+    import numpy as np
+
+    if np.any(ys <= 0):
+        raise ValueError("Power-law losses must be positive.")
+
+    upper = float(ys.min()) * 0.999
+    lower = 0.0
+    if upper <= lower:
+        raise ValueError("Need positive losses to fit an offset power law.")
+
+    def fit_at_offset(offset: float) -> tuple[float, float, float]:
+        shifted = ys - offset
+        if np.any(shifted <= 0):
+            return float("inf"), 0.0, 0.0
+        alpha, log_A = np.polyfit(np.log(xs), np.log(shifted), 1)
+        A = float(math.exp(log_A))
+        pred = A * np.power(xs, alpha) + offset
+        sse = float(np.square(pred - ys).sum())
+        return sse, A, float(alpha)
+
+    # Golden-section search over the loss floor. This keeps the fallback small
+    # and dependency-free while matching scipy's result for smooth loss curves.
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    inv_phi = 1.0 / phi
+    a, b = lower, upper
+    c = b - (b - a) * inv_phi
+    d = a + (b - a) * inv_phi
+    fc = fit_at_offset(c)[0]
+    fd = fit_at_offset(d)[0]
+    for _ in range(100):
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - (b - a) * inv_phi
+            fc = fit_at_offset(c)[0]
+        else:
+            a, c, fc = c, d, fd
+            d = a + (b - a) * inv_phi
+            fd = fit_at_offset(d)[0]
+
+    offset = (a + b) / 2.0
+    _, A, alpha = fit_at_offset(offset)
+    return PowerLawFit(A=A, alpha=alpha, offset=float(offset))
 
 
 # ---------------------------------------------------------------------------

@@ -77,6 +77,23 @@ PRESET_CONFIGS = {
     "xl_1_5b": GPTConfig(
         num_layers=24, num_heads=32, head_dim=64, model_dim=2048, max_seq_len=2048,
     ),
+    # Exact dense Llama-style Moonlight Table 2 scaling-law settings.
+    # Parameter counts below exclude embeddings in the paper.
+    "moonlight_399m": GPTConfig(
+        num_layers=12, num_heads=12, head_dim=128, model_dim=1536, max_seq_len=8192,
+    ),
+    "moonlight_545m": GPTConfig(
+        num_layers=14, num_heads=14, head_dim=128, model_dim=1792, max_seq_len=8192,
+    ),
+    "moonlight_822m": GPTConfig(
+        num_layers=16, num_heads=16, head_dim=128, model_dim=2048, max_seq_len=8192,
+    ),
+    "moonlight_1_1b": GPTConfig(
+        num_layers=18, num_heads=18, head_dim=128, model_dim=2304, max_seq_len=8192,
+    ),
+    "moonlight_1_5b": GPTConfig(
+        num_layers=20, num_heads=20, head_dim=128, model_dim=2560, max_seq_len=8192,
+    ),
 }
 
 

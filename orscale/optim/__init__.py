@@ -32,6 +32,7 @@ _MUON_FAMILY = {
     "orscale_muon",
     "orscale_muon_wd",
     "orscale_muon_moonlight",
+    "orscale_muon_moonlight_calibrated",
     "mutrust",
     "muscale",
     "muscale_alpha",
@@ -95,7 +96,8 @@ def build_optimizer(
     Args:
         name: Optimizer name. One of 'adamw', 'lamb', 'muon', 'muon_moonlight',
               'orscale_original', 'orscale_muon', 'orscale_muon_wd',
-              'orscale_muon_moonlight', 'mutrust', 'muscale', 'muscale_alpha'.
+              'orscale_muon_moonlight', 'orscale_muon_moonlight_calibrated',
+              'mutrust', 'muscale', 'muscale_alpha'.
         model: The nn.Module to optimize.
         config: Dict of optimizer hyperparameters. Keys depend on the optimizer.
             Common keys: lr, weight_decay.
@@ -179,6 +181,7 @@ def build_optimizer(
             "orscale_muon",
             "orscale_muon_wd",
             "orscale_muon_moonlight",
+            "orscale_muon_moonlight_calibrated",
             "mutrust",
             "muscale",
             "muscale_alpha",
@@ -194,6 +197,7 @@ def build_optimizer(
             r_max=config.get("r_max", 1.5),
             eps=config.get("eps", 1e-6),
             ns_iters=config.get("ns_iters", 5),
+            c_denom=config.get("c_denom", None),
         )
 
     if adamw_opt is not None:

@@ -24,6 +24,15 @@ from orscale.analysis.scaling_law import (
     fit_power_law,
     plot_pareto,
 )
+from scripts.run_scaling_law import (
+    derive_training_overrides,
+    estimate_runtime_seconds,
+    filter_by_name,
+    format_duration,
+    resolve_optimizer_lr,
+    resolve_optimizer_value,
+    split_filter_values,
+)
 
 
 def test_compute_flops_matches_6nd():
@@ -76,3 +85,61 @@ def test_plot_pareto_writes_png(tmp_path: Path):
     plot_pareto(pts, fits=fits, out_path=str(out_path))
     assert out_path.exists()
     assert out_path.stat().st_size > 0
+
+
+def test_strict_moonlight_batch_derivation():
+    preset = {
+        "name": "moonlight_399m",
+        "tokens": 8.92e9,
+        "seq_len": 8192,
+        "batch_examples": 96,
+    }
+    overrides, meta = derive_training_overrides(
+        preset,
+        {"world_size": 8, "micro_batch_size": 1},
+        {},
+    )
+
+    assert "model.max_seq_len=8192" in overrides
+    assert "training.batch_size=1" in overrides
+    assert "training.grad_accum_steps=12" in overrides
+    assert "training.max_steps=11342" in overrides
+    assert meta["tokens_per_step"] == 96 * 8192
+    assert meta["actual_tokens"] == pytest.approx(11342 * 96 * 8192)
+
+
+def test_strict_moonlight_batch_derivation_requires_divisible_batch():
+    preset = {
+        "name": "bad_batch",
+        "tokens": 1e9,
+        "seq_len": 8192,
+        "batch_examples": 100,
+    }
+
+    with pytest.raises(ValueError, match="not divisible"):
+        derive_training_overrides(preset, {"world_size": 8, "micro_batch_size": 3}, {})
+
+
+def test_scaling_runner_filters_and_symbolic_lr():
+    items = [{"name": "adamw"}, {"name": "muon_moonlight"}]
+    selected = split_filter_values(["adamw,muon_moonlight"])
+    assert filter_by_name(items, selected, kind="optimizer") == items
+
+    preset = {"name": "moonlight_399m", "lr": 9.503e-4}
+    optimizer = {"name": "muon_moonlight", "adamw_lr": "same_as_lr"}
+    lr = resolve_optimizer_lr(preset, optimizer)
+
+    assert lr == pytest.approx(9.503e-4)
+    assert resolve_optimizer_value(optimizer["adamw_lr"], lr=lr) == pytest.approx(lr)
+
+
+def test_runtime_estimate_uses_effective_pflops():
+    seconds = estimate_runtime_seconds(
+        params=1.25e8,
+        actual_tokens=2.62144e9,
+        cfg={"estimate_pflops_per_second": 0.5},
+        preset={},
+    )
+
+    assert seconds == pytest.approx(6 * 1.25e8 * 2.62144e9 / 0.5e15)
+    assert format_duration(seconds) == "1h 5m"

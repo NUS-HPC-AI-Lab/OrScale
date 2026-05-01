@@ -1,0 +1,87 @@
+# Strict Moonlight Table 2 scaling-law comparison.
+#
+# Primary goal: compare optimizer families without changing model size, token
+# budget, learning rate, weight decay, or global batch across optimizers.
+# Paper batch is measured in examples at 8K context length.
+
+base_config: configs/small_125m.yaml
+output_dir: results/moonlight_scaling_strict
+seeds: 1
+seed_base: 42
+
+# Runtime defaults. The runner derives:
+#   grad_accum_steps = batch_examples / (micro_batch_size * world_size)
+#   max_steps        = round(tokens / (batch_examples * seq_len))
+world_size: 8
+micro_batch_size: 1
+
+# Rough 8x H20-3E bf16 effective throughput assumption for planning only.
+# Override with ESTIMATE_PFLOPS_PER_SEC in scripts/run_moonlight_scaling_8gpu.sh
+# after you observe real tokens/sec on your machines.
+estimate_pflops_per_second: 0.5
+
+presets:
+  - name: fineweb_small_125m
+    model_preset: small
+    params: 1.25e8
+    tokens: 2.62144e9
+    seq_len: 1024
+    batch_examples: 256
+    micro_batch_size: 32
+    lr: 1.0e-3
+  - name: moonlight_399m
+    params: 3.99e8
+    tokens: 8.92e9
+    seq_len: 8192
+    batch_examples: 96
+    lr: 9.503e-4
+  - name: moonlight_545m
+    params: 5.45e8
+    tokens: 14.04e9
+    seq_len: 8192
+    batch_examples: 128
+    lr: 9.143e-4
+  - name: moonlight_822m
+    params: 8.22e8
+    tokens: 20.76e9
+    seq_len: 8192
+    batch_examples: 160
+    lr: 8.825e-4
+  - name: moonlight_1_1b
+    params: 1.1e9
+    tokens: 28.54e9
+    seq_len: 8192
+    batch_examples: 192
+    lr: 8.561e-4
+  - name: moonlight_1_5b
+    params: 1.5e9
+    tokens: 38.91e9
+    seq_len: 8192
+    batch_examples: 256
+    lr: 8.305e-4
+
+optimizers:
+  - name: adamw
+    weight_decay: 0.1
+  - name: muon_moonlight
+    weight_decay: 0.1
+    adamw_lr: same_as_lr
+    adamw_weight_decay: 0.1
+  - name: orscale_muon_moonlight
+    weight_decay: 0.1
+    adamw_lr: same_as_lr
+    adamw_weight_decay: 0.1
+    r_min: 0.1
+    r_max: 5.0
+  - name: orscale_muon_moonlight_calibrated
+    weight_decay: 0.1
+    adamw_lr: same_as_lr
+    adamw_weight_decay: 0.1
+    r_min: 0.1
+    r_max: 5.0
+
+launcher:
+  command: torchrun
+  extra_args:
+    - --standalone
+    - --nproc_per_node=8

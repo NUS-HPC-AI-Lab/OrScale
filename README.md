@@ -8,18 +8,34 @@ OrScale combines Muon's orthogonalized update direction (Newton-Schulz polar fac
 
 Every variant that applies "Moonlight shape normalization" uses the full Moonlight RMS-matching constant `0.2 * sqrt(max(m, n))` (arXiv:2502.16982).
 
-| Variant | Momentum | Trust Ratio Denom | Shape Norm | Key Feature |
-|---------|----------|-------------------|------------|-------------|
-| **Muon** | Nesterov | — | — | Baseline orthogonalized optimizer |
-| **Muon + Moonlight** | Nesterov | — | 0.2·sqrt(max(m,n)) | Static shape normalization |
-| **OrScale-Muon** | Nesterov | \|\|Q\|\|_F | — | Original trust ratio on standard Muon |
-| **OrScale-Muon-WD** | Nesterov | \|\|λW + Q\|\|_F | — | Coupled WD trust ratio on full Muon update |
-| **OrScale-Muon-Moonlight** | Nesterov | \|\|λW + 0.2·sqrt(max(m,n))·Q\|\|_F | 0.2·sqrt(max(m,n)) | Dynamic trust ratio + coupled WD on Moonlight |
-| **MuTrust** | Nesterov | \|\|M_hat\|\|_F | — | Minimal fix: raw momentum denom |
+| Variant | Momentum | Trust Ratio Denom | Shape Norm | WD | Key Feature |
+|---------|----------|-------------------|------------|----|-------------|
+| **Muon** | Nesterov | — | — | coupled | Baseline orthogonalized optimizer |
+| **Muon + Moonlight** | Nesterov | — | 0.2·sqrt(max(m,n)) | coupled | Static shape normalization |
+| **OrScale-Muon** | Nesterov | \|\|Q\|\|_F | — | decoupled | Original trust ratio on standard Muon |
+| **OrScale-Muon-WD** | Nesterov | \|\|λW + Q\|\|_F | — | coupled | Coupled WD trust ratio on full Muon update |
+| **OrScale-Muon-Moonlight** | Nesterov | \|\|λW + 0.2·sqrt(max(m,n))·Q\|\|_F | 0.2·sqrt(max(m,n)) | coupled | Dynamic trust ratio + coupled WD on Moonlight |
+| **OrScale-Muon-Moonlight-Calibrated** ⭐ | Nesterov | c_denom_ℓ · \|\|Q\|\|_F (auto-calibrated) | 0.2·sqrt(max(m,n)) | decoupled | Width-invariant, r̂(0)=1 per layer; **recommended primary variant** |
+| **MuTrust** | Nesterov | \|\|M_hat\|\|_F | — | decoupled | Minimal fix: raw momentum denom (saturates the clip in practice — kept as ablation) |
+| **MuScale** | Nesterov | \|\|M_hat\|\|_F | 0.2·sqrt(max(m,n)) | decoupled | MuTrust + Moonlight shape (saturates the clip in practice — kept as ablation) |
 
 Additional baselines: **AdamW**, **LAMB**.
 
-The research memo prioritizes the six variants above for comparison. Additional experimental variants such as **OrScale-original**, **MuScale**, and **MuScale-alpha** remain implemented for ablations and degeneration tests.
+The recommended primary variant is **OrScale-Muon-Moonlight-Calibrated**: the per-layer denominator scale `c_denom_ℓ` is auto-calibrated at the first step so that the trust ratio `r̂` is exactly 1 for every layer at initialization, which restores both width-invariance (Moonlight-style muP-friendly LR transfer) and a genuinely adaptive trust ratio centred at 1 across training (LARS-style per-layer scaling).
+
+The two raw-momentum-denominator variants (**MuTrust**, **MuScale**) are formally informative but practically degenerate at typical training conditions — their trust ratios are saturated at `r_max` on essentially every step because `||W||_F / ||M_hat||_F` is `O(1/η_t) ≫ 1`. They are kept as ablations that motivate the calibration. See `documents/OrScale_research_memo.md` and `documents/nips_paper/main.tex` for the full empirical analysis.
+
+Additional experimental variants such as **OrScale-original**, **MuScale-alpha** remain implemented for degeneration tests.
+
+### Recommended trust-ratio clipping bounds
+
+| Variant | `r_min` | `r_max` | Notes |
+|---|---|---|---|
+| `OrScale-Muon`, `OrScale-Muon-WD`, `MuTrust`, `MuScale` | 0.5 | 1.5 | Tight default. For `MuTrust` / `MuScale` the clip is the only thing keeping the optimizer from running at runaway effective LR — they saturate at `r_max` on ~100% of steps regardless of clip choice. |
+| `OrScale-Muon-Moonlight` | 0.1 | 5.0 | LARS/LAMB-style looser bounds. Without the looser bounds the empirical `r̂` runs in `[0.5, 0.74]` at the optimal LR on FineWeb with `r_min=0.5` firing ~16% of steps. |
+| `OrScale-Muon-Moonlight-Calibrated` | 0.1 | 5.0 | Same looser bounds. Auto-calibrated denominator sets `r̂(0)=1` per layer, giving the widest natural operating range. |
+
+The two Moonlight-shape variants share the looser `[0.1, 5.0]` clip because they have a shape-constant or auto-calibrated denominator. Sweep scripts in `scripts/sweep_*.sh` apply the per-variant defaults automatically; the analytic LAMB convention is `[0, 10]`, tightened here to `[0.1, 5]` because Muon's orthogonalization already controls the update direction.
 
 ## Setup
 
@@ -173,13 +189,55 @@ This uses EleutherAI's `lm-evaluation-harness` (`pip install lm-eval`) under the
 
 ## Scaling-law driver
 
-Reproduce Moonlight Figure 3 / Table 3 (Muon vs AdamW scaling law) by sweeping (model size, token budget) pairs and fitting `L(C) = A * C^alpha`:
+Reproduce Moonlight Figure 3 / Table 3 by sweeping `(model size, token budget, optimizer)` triples and fitting `L(C) = A * C^alpha`:
 
 ```bash
 python scripts/run_scaling_law.py --config configs/scaling_law.yaml
 ```
 
-This launches a training run for each `(preset, tokens, optimizer)` combination, writes `scaling_law.csv`, and on completion fits the power law via `scipy.optimize.curve_fit` and saves `scaling_law.png` + `scaling_law_fits.json`. New Moonlight-sized GPT presets `xs_400m`, `s_550m`, `m_800m`, `l_1_1b`, and `xl_1_5b` are available in `orscale.model.gpt.PRESET_CONFIGS` for this sweep.
+This launches a training run for each `(preset, tokens, optimizer)` combination, writes `scaling_law.csv`, and on completion fits the power law and saves `scaling_law.png` + `scaling_law_fits.json`. Approximate Moonlight-sized GPT presets `xs_400m`, `s_550m`, `m_800m`, `l_1_1b`, and `xl_1_5b` are available in `orscale.model.gpt.PRESET_CONFIGS`.
+
+### Strict Moonlight Table 2 comparison
+
+For the primary optimizer comparison, use the strict config and 8-GPU wrapper:
+
+```bash
+# Inspect the exact torchrun commands first.
+DRY_RUN=1 OPTIMIZER=adamw bash scripts/run_moonlight_scaling_8gpu.sh
+
+# Run a quick FineWeb-small-sized sanity cell.
+PRESETS=fineweb_small_125m DRY_RUN=1 OPTIMIZER=adamw \
+    bash scripts/run_moonlight_scaling_8gpu.sh
+
+# Select multiple presets on the same machine.
+PRESETS=moonlight_399m,moonlight_545m OPTIMIZER=adamw \
+    bash scripts/run_moonlight_scaling_8gpu.sh
+
+# Run one optimizer per 8-GPU machine.
+OPTIMIZER=adamw bash scripts/run_moonlight_scaling_8gpu.sh
+OPTIMIZER=muon_moonlight bash scripts/run_moonlight_scaling_8gpu.sh
+OPTIMIZER=orscale_muon_moonlight bash scripts/run_moonlight_scaling_8gpu.sh
+OPTIMIZER=orscale_muon_moonlight_calibrated bash scripts/run_moonlight_scaling_8gpu.sh
+```
+
+The strict path follows Moonlight Table 2 dense settings: 8K context, batch sizes `96/128/160/192/256` examples, paper token budgets, and paper learning rates for every optimizer. With `NPROC=8` and local `training.batch_size=1`, the runner derives gradient accumulation `12/16/20/24/32`. It also includes `fineweb_small_125m`, which maps to the existing `small` GPT preset at 1024 context for cheaper sanity runs. Keeping batch fixed across optimizers is the clean primary comparison; larger-batch OrScale runs should be treated as a follow-up ablation.
+
+Dry runs print an estimated wall time per preset using `estimate_pflops_per_second` from the config. The default is a rough `0.5` effective PFLOP/s for 8x H20-3E; override it after your first observed throughput:
+
+```bash
+ESTIMATE_PFLOPS_PER_SEC=0.65 PRESETS=moonlight_399m,moonlight_545m \
+    DRY_RUN=1 OPTIMIZER=adamw bash scripts/run_moonlight_scaling_8gpu.sh
+```
+
+Useful overrides:
+
+```bash
+TRAIN_PATTERN="/data/fineweb10B/fineweb_train_*.bin" \
+VAL_PATTERN="/data/fineweb10B/fineweb_val_*.bin" \
+SAVE_DIR="/data/checkpoints/moonlight_scaling" \
+OPTIMIZER=orscale_muon_moonlight_calibrated \
+bash scripts/run_moonlight_scaling_8gpu.sh
+```
 
 ## Running Tests
 
@@ -232,6 +290,7 @@ configs/
   imagenet_resnet50_bs16k.yaml      # ImageNet + ResNet-50, global bs 16K (LAMB Table 5)
   imagenet_resnet50_bs32k.yaml      # ImageNet + ResNet-50, global bs 32K, polynomial decay
   scaling_law.yaml                  # Moonlight-style (N, D) sweep
+  scaling_law_moonlight_strict.yaml # Strict Moonlight Table 2 optimizer comparison
 scripts/
   prepare_data.py         # Download & tokenize FineWeb into .bin shards
   prepare_vision_data.py  # Download CIFAR-10 / extract ImageNet-1K tarballs
@@ -239,6 +298,7 @@ scripts/
   train_vision.py         # Vision training entry point
   eval_downstream.py      # Run lm-eval on a saved checkpoint
   run_scaling_law.py      # Moonlight-style scaling-law sweep
+  run_moonlight_scaling_8gpu.sh # Single-node 8-GPU strict scaling wrapper
   sweep.py                # HP sweep launcher
 tests/
   test_newton_schulz.py
@@ -259,10 +319,12 @@ tests/
 
 ## Key Design Decisions
 
-1. **Single OrScale class**: All four variants share one `OrScaleOptimizer` class, differing only in config flags. This prevents implementation divergence and makes ablations trivial.
+1. **Single OrScale class**: All OrScale variants share one `OrScaleOptimizer` class, differing only in config flags. This prevents implementation divergence and makes ablations trivial.
 
 2. **Muon-family optimizer factory**: `build_optimizer()` automatically splits model parameters into matrix (2D) and non-matrix groups, applying the Muon-family optimizer to matrices and AdamW to the rest.
 
-3. **Diagnostic hooks**: Each optimizer exposes a `_diagnostics` dict with per-layer metrics (trust ratios, norms, clipping status) that the `DiagnosticLogger` reads after each step.
+3. **Diagnostic hooks**: Each optimizer exposes a `_diagnostics` dict with per-layer metrics (trust ratios, norms, clipping status, calibration constants) that the `DiagnosticLogger` reads after each step.
 
-4. **Degeneration tests**: The test suite verifies that MuScale with constant trust ratio degenerates exactly to Muon + Moonlight, ensuring implementation correctness.
+4. **Auto-calibration with override**: `OrScale-Muon-Moonlight-Calibrated` auto-calibrates its per-layer denominator constant `c_denom_ℓ` at the first optimizer step so that `r̂(0) = 1` exactly. A user-supplied `c_denom` (constant across layers) overrides the auto-calibration; this is useful for ablating the contribution of the calibration itself.
+
+5. **Degeneration tests**: The test suite verifies that MuScale with constant trust ratio degenerates exactly to Muon + Moonlight, ensuring implementation correctness.

@@ -1,20 +1,29 @@
 #!/usr/bin/env bash
-# Sweep all 7 OrScale memo variants + AdamW + LAMB on CIFAR-10 / DavidNet.
+# Sweep all 8 OrScale memo variants + AdamW + LAMB on CIFAR-10 / DavidNet.
 #
 # Hardware target  : 2 x A100-40G (single node, no DDP).
 #   Each run uses 1 GPU, batch_size=512, matching the Muon blog reference.
 #   sweep.py launches `--parallel 2` runs at a time, assigning CUDA_VISIBLE_DEVICES
 #   per run (logical device 0 inside the child process maps to one physical GPU).
 #
-# Optimizers       : 7 Muon-family + AdamW + LAMB
-# Per-family LR    : Muon family {0.005, 0.01, 0.02, 0.04} for six variants
+# Optimizers       : 8 Muon-family + AdamW + LAMB
+# Per-family LR    : Muon family {0.005, 0.01, 0.02, 0.04} for seven variants
 #                    (muon, muon_moonlight, orscale_muon, orscale_muon_wd,
-#                    orscale_muon_moonlight, mutrust)
+#                    orscale_muon_moonlight, orscale_muon_moonlight_calibrated,
+#                    mutrust)
 #                    muscale       {0.04, 0.06, 0.08, 0.12} (follow-up grid;
 #                    override with MUSCALE_LRS=...)
 #                    AdamW/LAMB    {1e-3, 3e-3, 1e-2}
+# Per-variant trust-ratio clip:
+#                    Default (YAML)                       r_min=0.5, r_max=1.5
+#                    orscale_muon_moonlight             → r_min=0.1, r_max=5.0
+#                    orscale_muon_moonlight_calibrated  → r_min=0.1, r_max=5.0
+#                    (Moonlight-shape variants get LARS/LAMB-style looser
+#                    bounds: the calibrated denominator is auto-set so
+#                    r̂(0)=1 per layer; the original Moonlight variant's
+#                    natural r̂ range is also wider than the tight default)
 # Seeds per cell   : 3
-# Total runs       : (7 * 4 + 2 * 3) * 3 = 102
+# Total runs       : (8 * 4 + 2 * 3) * 3 = 114
 #
 # The 7th Muon-family variant is `muscale` (added 2026-04-28): mutrust's
 # trust ratio (||W||_F / ||M_hat||_F, identical to OrScale2's after
@@ -88,16 +97,35 @@ MUSCALE_LRS="${MUSCALE_LRS:-0.04,0.06,0.08,0.12}"
 ADAM_LRS="0.001,0.003,0.01"
 
 declare -a JOBS=(
-  "muon                    ${MUON_LRS}"
-  "muon_moonlight          ${MUON_LRS}"
-  "orscale_muon            ${MUON_LRS}"
-  "orscale_muon_wd         ${MUON_LRS}"
-  "orscale_muon_moonlight  ${MUON_LRS}"
-  "mutrust                 ${MUON_LRS}"
-  "muscale                 ${MUSCALE_LRS}"
-  "adamw                   ${ADAM_LRS}"
-  "lamb                    ${ADAM_LRS}"
+  "muon                                ${MUON_LRS}"
+  "muon_moonlight                      ${MUON_LRS}"
+  "orscale_muon                        ${MUON_LRS}"
+  "orscale_muon_wd                     ${MUON_LRS}"
+  "orscale_muon_moonlight              ${MUON_LRS}"
+  "orscale_muon_moonlight_calibrated   ${MUON_LRS}"
+  "mutrust                             ${MUON_LRS}"
+  "muscale                             ${MUSCALE_LRS}"
+  "adamw                               ${ADAM_LRS}"
+  "lamb                                ${ADAM_LRS}"
 )
+
+# Per-optimizer extra `--set` overrides passed through sweep.py.  Both
+# Moonlight-shape variants use LARS/LAMB-style looser clip bounds:
+#  - orscale_muon_moonlight: shape-constant denominator gives a wider
+#    natural trust-ratio range; the tight default fires r_min~16% of
+#    steps at the optimal LR on FineWeb.
+#  - orscale_muon_moonlight_calibrated: auto-calibrated denominator sets
+#    r̂(0)=1 per layer, so the natural operating range is wider still.
+extra_set_for_opt() {
+  case "$1" in
+    orscale_muon_moonlight | orscale_muon_moonlight_calibrated)
+      echo "optimizer.r_min=0.1 optimizer.r_max=5.0"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
 
 OPTIMIZERS="${OPTIMIZERS:-}"
 declare -a SELECTED_JOBS=()
@@ -116,7 +144,7 @@ if [[ -n "$OPTIMIZERS" ]]; then
     done
     if [[ "$found" -eq 0 ]]; then
       echo "[error] unknown optimizer in OPTIMIZERS: $requested_opt" >&2
-      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight mutrust muscale adamw lamb" >&2
+      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight orscale_muon_moonlight_calibrated mutrust muscale adamw lamb" >&2
       exit 1
     fi
   done
@@ -142,14 +170,34 @@ for entry in "${SELECTED_JOBS[@]}"; do
   read -r OPT LRS <<< "$entry"
   echo
   echo ">>> Sweeping optimizer=${OPT}  lrs=[${LRS}]"
-  python scripts/sweep.py \
-    --script scripts/train_vision.py \
-    --config "$CONFIG" \
-    --sweep "optimizer.name=${OPT}" "optimizer.lr=${LRS}" \
-    --seeds "$SEEDS" \
-    --parallel "$PARALLEL" \
-    --no-stream \
-    $DRY_FLAG
+
+  # Per-variant fixed overrides (passed as singleton --sweep entries so they
+  # propagate to every (lr, seed) cell as `key=value` overrides).  Built as a
+  # space-separated string and only spliced into the cmd when non-empty (so
+  # the `set -u` discipline does not fire on the empty-array expansion path,
+  # which is unsafe on bash 3.2).
+  EXTRA_SET="$(extra_set_for_opt "$OPT")"
+
+  if [[ -n "$EXTRA_SET" ]]; then
+    # shellcheck disable=SC2086
+    python scripts/sweep.py \
+      --script scripts/train_vision.py \
+      --config "$CONFIG" \
+      --sweep "optimizer.name=${OPT}" "optimizer.lr=${LRS}" $EXTRA_SET \
+      --seeds "$SEEDS" \
+      --parallel "$PARALLEL" \
+      --no-stream \
+      $DRY_FLAG
+  else
+    python scripts/sweep.py \
+      --script scripts/train_vision.py \
+      --config "$CONFIG" \
+      --sweep "optimizer.name=${OPT}" "optimizer.lr=${LRS}" \
+      --seeds "$SEEDS" \
+      --parallel "$PARALLEL" \
+      --no-stream \
+      $DRY_FLAG
+  fi
 done
 
 echo

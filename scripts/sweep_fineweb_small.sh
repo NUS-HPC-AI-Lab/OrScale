@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sweep all 7 OrScale memo variants + AdamW + LAMB on FineWeb-Edu (LM) at the
+# Sweep all 8 OrScale memo variants + AdamW + LAMB on FineWeb-Edu (LM) at the
 # "small" scale (configs/small_125m.yaml, optionally configs/pilot_25m.yaml).
 #
 # Hardware target  : 1 node x 4 A100 (single-node DDP, one run at a time).
@@ -29,11 +29,32 @@
 #                                                     orscale_muon_wd)
 #   AdamW / LAMB grid  : {3e-4, 1e-3, 3e-3}          (adamw, lamb)
 #   Moonlight grid     : {3e-4, 1e-3, 3e-3, 5e-3}    (muon_moonlight,
-#                                                     orscale_muon_moonlight)
+#                                                     orscale_muon_moonlight,
+#                                                     orscale_muon_moonlight_calibrated)
 #   muscale grid       : {1e-4, 3e-4, 5e-4, 1e-3}    (muscale only -- denser
 #                                                     low-LR bracket per
 #                                                     reports/fineweb_small/)
 #   mutrust grid       : {0.005, 0.01, 0.02}         (mutrust)
+#
+# Per-variant trust-ratio clip overrides:
+#   Default (set in YAML)              : r_min=0.5, r_max=1.5
+#     This is the post-2026-04-22 tight clip used by the older OrScale
+#     variants (orscale_muon, orscale_muon_wd, mutrust, muscale).  For
+#     mutrust and muscale specifically, this clip is the only thing
+#     keeping the optimizer from running at runaway effective LR -- their
+#     raw ratio is O(1/lr) and saturates the clip on ~100% of steps no
+#     matter what r_max is.
+#   Moonlight-shape variants            : r_min=0.1, r_max=5.0
+#     (orscale_muon_moonlight, orscale_muon_moonlight_calibrated)
+#     These have a shape-constant or auto-calibrated denominator with a
+#     wider natural operating range and benefit from LARS/LAMB-style
+#     looser bounds.  The calibrated variant's denominator is auto-set
+#     per layer so r̂(0)=1; the original Moonlight variant's r̂ runs in
+#     [0.5, 0.74] at the optimal LR on FineWeb, with r_min=0.5 firing
+#     ~16% of the time -- looser bounds remove that artefact while still
+#     catching pathological steps.  The analytic LAMB convention is
+#     [0, 10]; we tighten to [0.1, 5] because Muon's orthogonalization
+#     already controls the direction.
 #
 # Why four grids instead of two (history):
 #   Update 2026-04-22: The `0.2 * sqrt(max(m, n))` Moonlight shape-
@@ -183,16 +204,31 @@ MUTRUST_LRS=(0.005 0.01 0.02)
 # (optimizer_name, lr_family) where lr_family selects MUON_LRS, ADAM_LRS,
 # MOONLIGHT_LRS, MUSCALE_LRS, or MUTRUST_LRS.
 declare -a JOBS=(
-  "muon                    MUON"
-  "muon_moonlight          MOONLIGHT"
-  "orscale_muon            MUON"
-  "orscale_muon_wd         MUON"
-  "orscale_muon_moonlight  MOONLIGHT"
-  "mutrust                 MUTRUST"
-  "muscale                 MUSCALE"
-  "adamw                   ADAM"
-  "lamb                    ADAM"
+  "muon                                MUON"
+  "muon_moonlight                      MOONLIGHT"
+  "orscale_muon                        MUON"
+  "orscale_muon_wd                     MUON"
+  "orscale_muon_moonlight              MOONLIGHT"
+  "orscale_muon_moonlight_calibrated   MOONLIGHT"
+  "mutrust                             MUTRUST"
+  "muscale                             MUSCALE"
+  "adamw                               ADAM"
+  "lamb                                ADAM"
 )
+
+# Emit per-optimizer extra `--set` overrides (trust-ratio clip etc.).  Returns
+# a space-separated string of `key=value` entries to be appended to the
+# train.py --set list, or empty when the YAML defaults are correct.
+extra_set_for_opt() {
+  case "$1" in
+    orscale_muon_moonlight | orscale_muon_moonlight_calibrated)
+      echo "optimizer.r_min=0.1 optimizer.r_max=5.0"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
 
 OPTIMIZERS="${OPTIMIZERS:-}"
 declare -a SELECTED_JOBS=()
@@ -211,7 +247,7 @@ if [[ -n "$OPTIMIZERS" ]]; then
     done
     if [[ "$found" -eq 0 ]]; then
       echo "[error] unknown optimizer in OPTIMIZERS: $requested_opt" >&2
-      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight mutrust muscale adamw lamb" >&2
+      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight orscale_muon_moonlight_calibrated mutrust muscale adamw lamb" >&2
       exit 1
     fi
   done
@@ -315,6 +351,14 @@ for CONFIG in $CONFIGS; do
           "training.seed=${SEED}"
           "training.grad_accum_steps=${GRAD_ACCUM_STEPS}"
         )
+
+        # Append per-variant clip / hyperparameter overrides if any.
+        EXTRA_SET="$(extra_set_for_opt "$OPT")"
+        if [[ -n "$EXTRA_SET" ]]; then
+          for kv in $EXTRA_SET; do
+            cmd+=("$kv")
+          done
+        fi
 
         if [[ "$DRY_RUN" == "1" ]]; then
           echo "      [dry-run] ${cmd[*]}"

@@ -225,17 +225,19 @@ def log_run_summary(
         "orscale_muon",
         "orscale_muon_wd",
         "orscale_muon_moonlight",
+        "orscale_muon_moonlight_calibrated",
         "mutrust",
         "muscale",
         "muscale_alpha",
     }:
         log_main(
-            "  optimizer extras: ns_iters=%s adamw_lr=%s alpha=%s r_min=%s r_max=%s",
+            "  optimizer extras: ns_iters=%s adamw_lr=%s alpha=%s r_min=%s r_max=%s c_denom=%s",
             opt_cfg.get("ns_iters", 5),
             opt_cfg.get("adamw_lr", "auto"),
             opt_cfg.get("alpha", "n/a"),
             opt_cfg.get("r_min", "n/a"),
             opt_cfg.get("r_max", "n/a"),
+            opt_cfg.get("c_denom", "auto"),
         )
 
     log_main(
