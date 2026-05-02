@@ -73,6 +73,7 @@ def build_wandb_run_metadata(config_path: str, config: dict) -> dict[str, object
     lr = opt_cfg.get("lr")
     seed = train_cfg.get("seed", 42)
     base_group = logging_cfg.get("wandb_group") or config_name
+    explicit_name = logging_cfg.get("wandb_name")
 
     name_parts = [config_name, optimizer_name]
     if lr is not None:
@@ -87,7 +88,7 @@ def build_wandb_run_metadata(config_path: str, config: dict) -> dict[str, object
         tags.append(f"model:{preset}")
 
     return {
-        "name": "-".join(name_parts),
+        "name": explicit_name or "-".join(name_parts),
         "group": base_group,
         "job_type": optimizer_name,
         "tags": tags,

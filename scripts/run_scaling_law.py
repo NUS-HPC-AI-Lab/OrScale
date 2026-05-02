@@ -380,6 +380,7 @@ def main() -> None:
                     *training_overrides,
                     f"training.seed={run_seed}",
                     f"optimizer.name={opt_name}",
+                    f"logging.wandb_name={run_id}",
                 ]
                 if lr is not None:
                     overrides.append(f"optimizer.lr={lr}")

@@ -32,7 +32,11 @@ EXTRA_SET="${EXTRA_SET:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Runs training with the repo's conda env (see README / other scripts using `conda run -n orscale`).
+CONDA_ENV="${CONDA_ENV:-orscale}"
+
 cmd=(
+  conda run -n "$CONDA_ENV" --no-capture-output
   python
   scripts/run_scaling_law.py
   --config "$CONFIG"
