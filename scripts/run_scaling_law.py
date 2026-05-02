@@ -73,32 +73,35 @@ _LAST_VAL_LOSS_RE = re.compile(r"val_loss\s+([0-9.]+)")
 _NPROC_RE = re.compile(r"--nproc_per_node(?:=|\s+)(\d+)")
 
 
-def split_filter_values(values: list[str] | None) -> set[str] | None:
-    """Parse repeated comma/space separated filter flags into a set."""
+def split_filter_values(values: list[str] | None) -> list[str] | None:
+    """Parse repeated comma/space separated filter flags, preserving order."""
     if not values:
         return None
 
-    selected: set[str] = set()
+    selected: list[str] = []
+    seen: set[str] = set()
     for value in values:
         for part in value.replace(",", " ").split():
-            if part:
-                selected.add(part)
+            if part and part not in seen:
+                selected.append(part)
+                seen.add(part)
     return selected or None
 
 
-def filter_by_name(items: list[dict], selected: set[str] | None, *, kind: str) -> list[dict]:
-    """Filter config entries by their ``name`` while preserving config order."""
+def filter_by_name(items: list[dict], selected: list[str] | None, *, kind: str) -> list[dict]:
+    """Filter config entries by their ``name`` while preserving filter order."""
     if selected is None:
         return items
 
-    known = {str(item["name"]) for item in items}
-    unknown = selected - known
+    by_name = {str(item["name"]): item for item in items}
+    known = set(by_name)
+    unknown = set(selected) - known
     if unknown:
         raise ValueError(
             f"Unknown {kind} filter value(s): {', '.join(sorted(unknown))}. "
             f"Known {kind}s: {', '.join(sorted(known))}"
         )
-    return [item for item in items if str(item["name"]) in selected]
+    return [by_name[name] for name in selected]
 
 
 def infer_world_size(cfg: dict, launcher: dict) -> int:
@@ -379,7 +382,7 @@ def main() -> None:
                     f"model.preset={model_preset}",
                     *training_overrides,
                     f"training.seed={run_seed}",
-                    f"training.checkpoint_subdir={preset_name}",
+                    f"training.checkpoint_subdir={preset_name}/{opt_name}",
                     "training.checkpoint_subdir_mode=replace_leaf",
                     f"optimizer.name={opt_name}",
                     f"logging.wandb_name={run_id}",

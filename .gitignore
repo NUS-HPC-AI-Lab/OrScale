@@ -47,6 +47,5 @@ documents/
 .pytest_cache/
 
 # logs and pbs
-*.log
 *.pbs
 *.o[0-9]*
