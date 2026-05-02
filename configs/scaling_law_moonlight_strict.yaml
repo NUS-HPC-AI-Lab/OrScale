@@ -24,7 +24,7 @@ presets:
   - name: fineweb_small_125m
     model_preset: small
     params: 1.25e8
-    tokens: 2.62144e9
+    tokens: 5.24288e9
     seq_len: 1024
     batch_examples: 256
     micro_batch_size: 32
