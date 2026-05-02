@@ -2,13 +2,16 @@
 
 This report answers whether **trust ratios materially adapt** for
 `orscale_muon_moonlight`, `mutrust`, and `muscale` on FineWeb-Edu small_125m,
-or whether they sit at **`r_min`** / **`r_max`** most of the time.
+or whether they sit at **`r_min`** / **`r_max`** most of the time. It also
+records the first `orscale_muon_moonlight_calibrated` FineWeb Small follow-up.
 
 **Evidence source:** local W&B run files under `wandb/run-*-<id>/run-<id>.wandb`,
 decoded with the same W&B SDK as training (not only `wandb-summary.json`, which
 is mostly a last-step snapshot). Each completed run has **400** diagnostic rows
 (`log_every=50`, `max_steps=20000`). Config uses **`r_min=0.5`**, **`r_max=1.5`**
-(post-fix sweeps).
+(post-fix sweeps). The calibrated follow-up uses **`r_min=0.1`**,
+**`r_max=5.0`** and is currently available here only as the stdout/W&B summary
+log, not as decoded local W&B history.
 
 **Reproduce:**
 
@@ -28,6 +31,7 @@ conda run -n orscale python scripts/analyze_fineweb_trust_ratio.py
 | **`mutrust`** | **Not adaptive** (upper-saturated) | Cross-layer mean clipped trust is at **`r_max=1.5`** for **99.75–100%** of diagnostic steps at every LR in the post-fix grid. Raw ratio means are **≫ 1.5** (hundreds to tens of thousands). |
 | **`muscale`** | **Not adaptive** (upper-saturated) | Same pattern: **99.5–100%** of steps have mean clipped at **`r_max`**. Raw means stay **≫ `r_max`**; instability at high LR is consistent with trust doing almost nothing until clip. |
 | **`orscale_muon_moonlight`** | **Mixed / partially adaptive** | At **`lr=3e-3`** (best val in the post-fix sweep), mean clipped trust **varies** (min 0.5, max ~0.74); only **15.5%** of steps have mean exactly at **`r_min`**, **0%** stuck at **`r_max`** — trust **does** take effect. At **`lr=1e-3`** and **`3e-4`**, mean clipped trust is **exactly `r_min`** for **100%** of steps (fully lower-saturated). At **`lr=1e-2`**, **84%** of steps have mean at **`r_max`** (mostly upper-saturated). |
+| **`orscale_muon_moonlight_calibrated`** | **Promising but history not decoded** | The single **`lr=1e-3`** run is stable and improves same-LR final val from 3.2556 (`orscale_muon_moonlight@1e-3`) to **3.2264**. Full trust-ratio history still needs decoding before making a clipping/adaptation claim. |
 
 ---
 
@@ -63,6 +67,30 @@ Columns:
 Sweep mapping: `sweeps/fineweb_20260427_014028` (orscale_muon_moonlight),
 `sweeps/fineweb_20260427_061908` (mutrust), `sweeps/fineweb_20260429_024537`
 (muscale bump), `sweeps/fineweb_20260429_120914` (muscale post-fix).
+
+---
+
+## Calibrated follow-up (log-only)
+
+The calibrated design is motivated by the failure mode above: instead of using
+a raw-momentum denominator that saturates high, or the original Moonlight
+denominator that starts below 1 for many layers, it auto-calibrates a
+layer-static denominator so \(r_{\ell,0}=1\) and then measures each layer's
+relative weight-norm growth. See `documents/main.tex` and
+`documents/OrScale_research_memo.md` for the derivation.
+
+The current local artifact is the stdout log
+`results/moonlight_scaling_strict/log-fineweb_small_125m-orscale_muon_moonlight_calibrated-seed42.log`
+for W&B run `9qnh0b9k`.
+
+| opt | lr | clip bounds | final val (last-3 mean) | best val | bump | grad post-warmup mean / sat frac | available trust evidence |
+| --- | ---: | --- | ---: | ---: | --- | --- | --- |
+| `orscale_muon_moonlight_calibrated` | `1e-3` | `[0.1, 5.0]` | **3.2264** | 3.2261 | no | 0.197 / 0.004 | stdout log has only final W&B summary (`clip_active_mean=0.75` at the last logged diagnostic row); per-step history is not local |
+
+This result should be treated as a stable single-cell validation of the
+calibrated design, not as a final trust-ratio diagnostic. The next analysis
+step is to decode or fetch the W&B history for `9qnh0b9k` and compute the same
+`clip_mean`, `frac@r_min`, `frac@r_max`, and raw-ratio ranges used above.
 
 ---
 

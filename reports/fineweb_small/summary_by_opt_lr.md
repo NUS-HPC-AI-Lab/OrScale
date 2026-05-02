@@ -32,6 +32,7 @@ Sorted by `final_val_loss` (mean of last 3 logged val checkpoints).
 | new | orscale_muon_moonlight | 1e-3 | 3.2619 | 3.2556 | 3.2554 | no | 0.357 | 0.006 |
 | new | orscale_muon_moonlight | 3e-3 | 3.2310 | 3.2232 | 3.2229 | no | 0.248 | 0.000 |
 | new | orscale_muon_moonlight | 1e-2 | 4.6521 | 4.6790 | 4.1625 | YES | 6.475 | 0.999 |
+| new | orscale_muon_moonlight_calibrated | 1e-3 | 3.2337 | 3.2264 | 3.2261 | no | 0.197 | 0.004 |
 | old | orscale_muon_moonlight | 0.005 | 3.2186 | 3.2117 | 3.2113 | no | - | - |
 | old | orscale_muon_moonlight | 0.01 | 4.7287 | 4.7549 | 3.8971 | YES | - | - |
 | old | orscale_muon_moonlight | 0.02 | 5.8882 | 5.9297 | 4.3660 | YES | - | - |

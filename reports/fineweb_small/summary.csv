@@ -19,6 +19,7 @@ new,orscale_muon_moonlight,3e-4,42,1000,3.3501,3.3446,3.3445,19500,0,3.3383,,,,,
 new,orscale_muon_moonlight,1e-3,42,1000,3.2619,3.2556,3.2554,20000,0,3.2512,,,,,2000,0.488,0.357,0.006,sweeps/fineweb_20260427_014028/small_125m-orscale_muon_moonlight-lr1e-3-seed42.log
 new,orscale_muon_moonlight,3e-3,42,1000,3.2310,3.2232,3.2229,20000,0,3.2201,,,,,2000,0.315,0.248,0.000,sweeps/fineweb_20260427_014028/small_125m-orscale_muon_moonlight-lr3e-3-seed42.log
 new,orscale_muon_moonlight,1e-2,42,1000,4.6521,4.6790,4.1625,1000,1,4.1432,5.7836,4.6372,1.6404,1.1464,2000,6.207,6.475,0.999,sweeps/fineweb_20260427_014028/small_125m-orscale_muon_moonlight-lr1e-2-seed42.log
+new,orscale_muon_moonlight_calibrated,1e-3,42,1000,3.2337,3.2264,3.2261,20000,0,3.2077,,,,,2000,0.299,0.197,0.004,results/moonlight_scaling_strict/log-fineweb_small_125m-orscale_muon_moonlight_calibrated-seed42.log
 old,muon_moonlight,0.005,42,1000,4.3126,4.3237,4.0135,2000,1,3.9912,5.5022,4.2960,1.5110,1.2061,0,,,,sweeps/fineweb_20260421_034858/small_125m-muon_moonlight-lr0.005-seed42.log
 old,muon_moonlight,0.01,42,1000,4.6406,4.6690,4.4868,1000,1,4.3639,5.3856,4.6259,1.0218,0.7598,0,,,,sweeps/fineweb_20260421_034858/small_125m-muon_moonlight-lr0.01-seed42.log
 old,muon_moonlight,0.02,42,1000,4.7244,4.7518,4.7513,20000,1,4.7057,5.6397,4.7098,0.9340,0.9299,0,,,,sweeps/fineweb_20260421_034858/small_125m-muon_moonlight-lr0.02-seed42.log
