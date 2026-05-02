@@ -15,13 +15,13 @@ Every variant that applies "Moonlight shape normalization" uses the full Moonlig
 | **OrScale-Muon** | Nesterov | \|\|Q\|\|_F | — | decoupled | Original trust ratio on standard Muon |
 | **OrScale-Muon-WD** | Nesterov | \|\|λW + Q\|\|_F | — | coupled | Coupled WD trust ratio on full Muon update |
 | **OrScale-Muon-Moonlight** | Nesterov | \|\|λW + 0.2·sqrt(max(m,n))·Q\|\|_F | 0.2·sqrt(max(m,n)) | coupled | Dynamic trust ratio + coupled WD on Moonlight |
-| **OrScale-Muon-Moonlight-Calibrated** ⭐ | Nesterov | c_denom_ℓ · \|\|Q\|\|_F (auto-calibrated) | 0.2·sqrt(max(m,n)) | decoupled | Width-invariant, r̂(0)=1 per layer; **recommended primary variant** |
+| **OrScale-Muon-Moonlight-Calibrated** ⭐ | Nesterov | c_denom_ℓ · \|\|λW + 0.2·sqrt(max(m,n))·Q\|\|_F (auto-calibrated) | 0.2·sqrt(max(m,n)) | coupled | Width-invariant, r̂(0)=1 per layer, finite asymptotic ceiling 1/(c_denom·λ); **recommended primary variant** |
 | **MuTrust** | Nesterov | \|\|M_hat\|\|_F | — | decoupled | Minimal fix: raw momentum denom (saturates the clip in practice — kept as ablation) |
 | **MuScale** | Nesterov | \|\|M_hat\|\|_F | 0.2·sqrt(max(m,n)) | decoupled | MuTrust + Moonlight shape (saturates the clip in practice — kept as ablation) |
 
 Additional baselines: **AdamW**, **LAMB**.
 
-The recommended primary variant is **OrScale-Muon-Moonlight-Calibrated**: the per-layer denominator scale `c_denom_ℓ` is auto-calibrated at the first step so that the trust ratio `r̂` is exactly 1 for every layer at initialization, which restores both width-invariance (Moonlight-style muP-friendly LR transfer) and a genuinely adaptive trust ratio centred at 1 across training (LARS-style per-layer scaling).
+The recommended primary variant is **OrScale-Muon-Moonlight-Calibrated**: it shares the "real update direction" denominator `||λW + 0.2·sqrt(max(m,n))·Q||_F` with `OrScale-Muon-Moonlight` and rescales it by a per-layer constant `c_denom_ℓ` auto-calibrated at the first step so that the trust ratio `r̂` is exactly 1 for every layer at initialization. Combined with coupled WD, this gives (i) width-invariance at init (Moonlight-style muP-friendly LR transfer), (ii) LARS-style early-training adaptation `r ≈ ||W_t||_F / ||W_0||_F`, and (iii) a stable asymptotic ceiling `r → 1/(c_denom_ℓ · λ)` that prevents runaway weight-norm growth (the failure mode of an earlier decoupled-WD calibrated formulation).
 
 The two raw-momentum-denominator variants (**MuTrust**, **MuScale**) are formally informative but practically degenerate at typical training conditions — their trust ratios are saturated at `r_max` on essentially every step because `||W||_F / ||M_hat||_F` is `O(1/η_t) ≫ 1`. They are kept as ablations that motivate the calibration. See `documents/OrScale_research_memo.md` and `documents/nips_paper/main.tex` for the full empirical analysis.
 
@@ -33,7 +33,7 @@ Additional experimental variants such as **OrScale-original**, **MuScale-alpha**
 |---|---|---|---|
 | `OrScale-Muon`, `OrScale-Muon-WD`, `MuTrust`, `MuScale` | 0.5 | 1.5 | Tight default. For `MuTrust` / `MuScale` the clip is the only thing keeping the optimizer from running at runaway effective LR — they saturate at `r_max` on ~100% of steps regardless of clip choice. |
 | `OrScale-Muon-Moonlight` | 0.1 | 5.0 | LARS/LAMB-style looser bounds. Without the looser bounds the empirical `r̂` runs in `[0.5, 0.74]` at the optimal LR on FineWeb with `r_min=0.5` firing ~16% of steps. |
-| `OrScale-Muon-Moonlight-Calibrated` | 0.1 | 5.0 | Same looser bounds. Auto-calibrated denominator sets `r̂(0)=1` per layer, giving the widest natural operating range. |
+| `OrScale-Muon-Moonlight-Calibrated` | 0.1 | 5.0 | Same looser bounds. Auto-calibrated denominator sets `r̂(0)=1` per layer; coupled WD provides a finite asymptotic ceiling `1/(c_denom_ℓ · λ)`, so the clip's role is to catch transient pathology rather than define the operating range. |
 
 The two Moonlight-shape variants share the looser `[0.1, 5.0]` clip because they have a shape-constant or auto-calibrated denominator. Sweep scripts in `scripts/sweep_*.sh` apply the per-variant defaults automatically; the analytic LAMB convention is `[0, 10]`, tightened here to `[0.1, 5]` because Muon's orthogonalization already controls the update direction.
 
@@ -325,6 +325,6 @@ tests/
 
 3. **Diagnostic hooks**: Each optimizer exposes a `_diagnostics` dict with per-layer metrics (trust ratios, norms, clipping status, calibration constants) that the `DiagnosticLogger` reads after each step.
 
-4. **Auto-calibration with override**: `OrScale-Muon-Moonlight-Calibrated` auto-calibrates its per-layer denominator constant `c_denom_ℓ` at the first optimizer step so that `r̂(0) = 1` exactly. A user-supplied `c_denom` (constant across layers) overrides the auto-calibration; this is useful for ablating the contribution of the calibration itself.
+4. **Auto-calibration with override**: `OrScale-Muon-Moonlight-Calibrated` auto-calibrates its per-layer denominator constant `c_denom_ℓ = ||W_ℓ(0)||_F / ||λW_ℓ(0) + 0.2·sqrt(max(m,n))·Q_ℓ(0)||_F` at the first optimizer step so that `r̂(0) = 1` exactly. A user-supplied `c_denom` (constant across layers) overrides the auto-calibration; this is useful for ablating the contribution of the calibration itself.
 
 5. **Degeneration tests**: The test suite verifies that MuScale with constant trust ratio degenerates exactly to Muon + Moonlight, ensuring implementation correctness.

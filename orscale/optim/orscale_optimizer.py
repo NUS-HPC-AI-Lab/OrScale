@@ -11,11 +11,12 @@ ratio designs in a single configurable class. Eight variants are implemented:
     OrScale-Muon-Moonlight            : Nesterov,      ||λW + 0.2·√max(m,n)·Q||_F
                                                        denominator, 0.2·√max(m,n)
                                                        shape norm, coupled WD update
-    OrScale-Muon-Moonlight-Calibrated : Nesterov,      c_denom_ℓ·||Q||_F denominator
-                                                       (c_denom_ℓ auto-calibrated
-                                                       per-layer at step 0 so
-                                                       r̂_ℓ(0)=1), 0.2·√max(m,n)
-                                                       shape norm, decoupled WD
+    OrScale-Muon-Moonlight-Calibrated : Nesterov,      c_denom_ℓ·||λW + 0.2·√max(m,n)·Q||_F
+                                                       denominator (c_denom_ℓ
+                                                       auto-calibrated per-layer
+                                                       at step 0 so r̂_ℓ(0)=1),
+                                                       0.2·√max(m,n) shape norm,
+                                                       coupled WD update
     MuTrust                           : Nesterov,      ||M_hat||_F denominator
     MuScale                           : Nesterov,      RMS(M_hat) denominator,
                                                        0.2·√max(m,n) shape norm
@@ -26,16 +27,22 @@ ratio designs in a single configurable class. Eight variants are implemented:
 All variants that apply Moonlight shape normalization use the full Moonlight
 RMS-matching constant ``0.2·sqrt(max(m, n))`` (see ``MOONLIGHT_RMS_CONSTANT``).
 
-The ``calibrated`` variant differs from ``orscale_muon_moonlight`` in three ways:
-(1) the denominator is decoupled from the Moonlight update factor and uses a
-per-layer reference scale ``c_denom_ℓ`` instead of ``0.2·√max(m,n)``; (2) the
-λW weight-decay contribution is dropped from the denominator (it is empirically
-<1% effect and complicates the analysis); (3) weight decay is decoupled from
-the trust ratio.  By default ``c_denom_ℓ`` is set per layer at step 0 from
-``||W_ℓ(0)||_F / ||Q_ℓ(0)||_F``, which makes the typical trust ratio land near
-1 at initialization regardless of init scheme or layer width, restoring the
-muP-style learning-rate transferability that ``orscale_muon_moonlight`` loses
-under Kaiming init.
+The ``calibrated`` variant is a per-layer calibrated extension of
+``orscale_muon_moonlight``: it shares the same "real update direction"
+denominator ``||λW + 0.2·√max(m,n)·Q||_F`` and the same coupled-WD update,
+but rescales the denominator by a per-layer constant ``c_denom_ℓ`` that
+anchors the trust ratio so ``r̂_ℓ(0) = 1`` for every layer.  By default
+``c_denom_ℓ`` is set per layer at step 0 from
+``||W_ℓ(0)||_F / ||λW_ℓ(0) + 0.2·√max(m,n)·Q_ℓ(0)||_F``, which (i) makes the
+trust ratio land at exactly 1 at initialization regardless of init scheme or
+layer width, restoring muP-style learning-rate transferability, and (ii)
+combined with coupled WD gives a stable fixed-point dynamic for ``r``: early
+in training ``r ≈ ||W_t||/||W_0||`` provides LARS-style adaptation tracking
+weight-norm growth, and asymptotically ``r → 1/(c_denom_ℓ · λ)`` is a finite
+ceiling (the runaway feedback loop that broke the previous
+``c_denom_ℓ · ||Q||_F`` decoupled-WD formulation is eliminated by coupled WD,
+which scales the WD pull-back together with the Q step so ``r`` cannot drive
+unbounded weight growth).
 
 See the OrScale research memo for the full derivation and motivation.
 """
@@ -131,12 +138,12 @@ class OrScaleOptimizer(Optimizer):
         c_denom: Per-layer reference scale used in the denominator of the
             ``orscale_muon_moonlight_calibrated`` variant only.  If ``None``
             (default), each layer's ``c_denom_ℓ`` is auto-calibrated at the
-            first step from ``||W_ℓ(0)||_F / ||Q_ℓ(0)||_F``, which makes
-            the trust ratio start at exactly 1 for every layer regardless of
-            init scheme or layer width.  If a positive float is provided, the
-            same value is used for every layer (e.g. ``math.sqrt(2)`` is the
-            analytic Kaiming-init value for square layers).  Ignored for all
-            other variants.
+            first step from
+            ``||W_ℓ(0)||_F / ||λW_ℓ(0) + 0.2·√max(m,n)·Q_ℓ(0)||_F``, which
+            makes the trust ratio start at exactly 1 for every layer
+            regardless of init scheme or layer width.  If a positive float
+            is provided, the same value is used for every layer.  Ignored
+            for all other variants.
     """
 
     def __init__(
@@ -220,6 +227,7 @@ class OrScaleOptimizer(Optimizer):
             scale_wd_with_trust = variant in (
                 OrScaleVariant.ORSCALE_MUON_WD,
                 OrScaleVariant.ORSCALE_MUON_MOONLIGHT,
+                OrScaleVariant.ORSCALE_MUON_MOONLIGHT_CALIBRATED,
             )
             effective_alpha = alpha if variant == OrScaleVariant.MUSCALE_ALPHA else 1.0
 
@@ -301,20 +309,35 @@ class OrScaleOptimizer(Optimizer):
                     grad_matrix = wd * p_float + shape_scale * Q.float()
                     m_stat = grad_matrix.norm()            # ||λW + s·Q||_F
                 elif use_calibrated_denom:
-                    # Decoupled denominator c_denom_ℓ * ||Q||_F.
+                    # Coupled denominator c_denom_ℓ * ||λW + s·Q||_F.
                     #
-                    # c_denom_ℓ is set per layer at the first step from
-                    # ||W_ℓ(0)||_F / ||Q_ℓ(0)||_F so that r_ℓ(0) = 1 for every
-                    # layer regardless of init scheme or layer shape, and
-                    # subsequent r_ℓ(t) ≈ ||W_ℓ(t)||_F / ||W_ℓ(0)||_F (since
-                    # ||Q_ℓ||_F ≈ √min(m,n) is approximately constant).
+                    # The denominator is the same "real update direction"
+                    # ||λW + s·Q||_F used by ``orscale_muon_moonlight``,
+                    # rescaled by a per-layer constant c_denom_ℓ that anchors
+                    # r_ℓ(0) = 1.  c_denom_ℓ is set per layer at the first
+                    # step from
+                    #
+                    #   c_denom_ℓ = ||W_ℓ(0)||_F / ||λW_ℓ(0) + s·Q_ℓ(0)||_F,
+                    #
+                    # giving r_ℓ(0) = 1 exactly for every layer regardless of
+                    # init scheme or shape.  Combined with coupled WD (see the
+                    # update step below), this gives a stable fixed-point
+                    # dynamic: r ≈ ||W_t||_F / ||W_0||_F early in training
+                    # (LARS-style adaptation), and asymptotically
+                    # r → 1/(c_denom_ℓ · λ), bounded above (no runaway).  The
+                    # earlier decoupled-WD ``c_denom_ℓ · ||Q||_F`` formulation
+                    # ran ||W||_F up by 10–50× on FineWeb small_125m on three
+                    # of four matrix-parameter classes; coupling the WD into
+                    # the trust-ratio-scaled update damps that feedback loop.
+                    grad_matrix = wd * p_float + shape_scale * Q.float()
+                    grad_matrix_norm = grad_matrix.norm()  # ||λW + s·Q||_F
                     if "c_denom" not in state:
                         if c_denom_user is not None:
                             state["c_denom"] = float(c_denom_user)
                         else:
                             w_init = w_norm.item()
-                            q_init = q_norm.item()
-                            if w_init < eps or q_init < eps:
+                            gm_init = grad_matrix_norm.item()
+                            if w_init < eps or gm_init < eps:
                                 # Fallback: pathological tiny init.  Use the
                                 # Moonlight shape constant so the optimizer
                                 # degenerates to scaled Moonlight rather than
@@ -323,10 +346,10 @@ class OrScaleOptimizer(Optimizer):
                                     MOONLIGHT_RMS_CONSTANT * math.sqrt(max(m, n))
                                 )
                             else:
-                                state["c_denom"] = w_init / q_init
+                                state["c_denom"] = w_init / gm_init
                     c_denom_layer = state["c_denom"]
                     w_stat = w_norm
-                    m_stat = c_denom_layer * q_norm        # c_denom_ℓ · ||Q||_F
+                    m_stat = c_denom_layer * grad_matrix_norm  # c_denom_ℓ · ||λW + s·Q||_F
                 else:
                     # MuTrust: raw Frobenius norms
                     w_stat = w_norm
