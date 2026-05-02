@@ -13,6 +13,7 @@ import time
 from typing import Any, Iterator
 
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 from torch import Tensor
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -71,7 +72,14 @@ class Trainer:
         self.val_steps = self.config.get("val_steps", 20)
         self.log_every = self.config.get("log_every", 10)
         self.save_every = self.config.get("save_every", 0)
-        self.save_dir = self.config.get("save_dir", "checkpoints")
+        self.save_dir = self._resolve_checkpoint_dir(
+            self.config.get("save_dir", "checkpoints"),
+            self.config.get("checkpoint_subdir"),
+            self.config.get("checkpoint_subdir_mode", "append"),
+        )
+        self.checkpoint_wait_timeout = float(
+            self.config.get("checkpoint_wait_timeout", 7200)
+        )
         self.use_amp = self.config.get("precision", "bfloat16") == "bfloat16"
 
         # Global gradient-norm clipping (applied after backward, before opt.step,
@@ -206,8 +214,8 @@ class Trainer:
                         self._wandb.log({"val/loss": val_loss}, step=step)
 
             # --- Checkpoint ---
-            if self.save_every > 0 and step % self.save_every == 0 and is_main_process():
-                self.save_checkpoint(step)
+            if self.save_every > 0 and step % self.save_every == 0:
+                self.save_checkpoint_distributed(step)
 
             # --- Downstream eval (optional) ---
             if (
@@ -263,10 +271,42 @@ class Trainer:
         model.train()
         return loss_tensor.item()
 
+    def save_checkpoint_distributed(self, step: int) -> None:
+        """Save on rank 0 while keeping other DDP ranks aligned."""
+        path = self._checkpoint_path(step)
+        marker_path = f"{path}.done"
+        wait_started_at = time.time()
+        marker_token = f"step={step}"
+
+        if is_main_process():
+            try:
+                os.remove(marker_path)
+            except FileNotFoundError:
+                pass
+
+        # Make sure all ranks have finished validation/logging and any stale
+        # completion marker is gone before rank 0 starts a slow filesystem write.
+        self._distributed_barrier()
+
+        if is_main_process():
+            self.save_checkpoint(step)
+            with open(marker_path, "w") as f:
+                f.write(f"{marker_token}\npath={path}\n")
+        else:
+            self._wait_for_checkpoint_marker(
+                marker_path,
+                marker_token,
+                wait_started_at,
+            )
+
+        # Once the checkpoint is known to be complete, realign ranks before the
+        # next DDP backward pass can enqueue gradient all-reduces.
+        self._distributed_barrier()
+
     def save_checkpoint(self, step: int):
         """Save model and optimizer state."""
         os.makedirs(self.save_dir, exist_ok=True)
-        path = os.path.join(self.save_dir, f"step_{step:06d}.pt")
+        path = self._checkpoint_path(step)
         state = {
             "step": step,
             "model": self.raw_model.state_dict(),
@@ -275,6 +315,59 @@ class Trainer:
         }
         torch.save(state, path)
         print(f"Checkpoint saved: {path}")
+
+    def _checkpoint_path(self, step: int) -> str:
+        return os.path.join(self.save_dir, f"step_{step:06d}.pt")
+
+    @staticmethod
+    def _resolve_checkpoint_dir(
+        save_dir: str,
+        checkpoint_subdir: str | None,
+        checkpoint_subdir_mode: str,
+    ) -> str:
+        if not checkpoint_subdir:
+            return save_dir
+
+        subdir = str(checkpoint_subdir).strip().strip("/")
+        if not subdir:
+            return save_dir
+        if os.path.basename(os.path.normpath(save_dir)) == subdir:
+            return save_dir
+
+        if checkpoint_subdir_mode == "replace_leaf":
+            return os.path.join(os.path.dirname(os.path.normpath(save_dir)), subdir)
+        if checkpoint_subdir_mode == "append":
+            return os.path.join(save_dir, subdir)
+
+        raise ValueError(
+            "checkpoint_subdir_mode must be either 'append' or 'replace_leaf'"
+        )
+
+    def _wait_for_checkpoint_marker(
+        self,
+        marker_path: str,
+        marker_token: str,
+        wait_started_at: float,
+    ) -> None:
+        deadline = wait_started_at + self.checkpoint_wait_timeout
+        while True:
+            try:
+                with open(marker_path) as f:
+                    if f.readline().strip() == marker_token:
+                        return
+            except FileNotFoundError:
+                pass
+
+            if time.time() >= deadline:
+                raise TimeoutError(
+                    f"Timed out waiting for checkpoint marker: {marker_path}"
+                )
+            time.sleep(5.0)
+
+    @staticmethod
+    def _distributed_barrier() -> None:
+        if dist.is_initialized() and dist.get_world_size() > 1:
+            dist.barrier()
 
     def load_checkpoint(self, path: str) -> int:
         """Load a checkpoint and return the step number."""

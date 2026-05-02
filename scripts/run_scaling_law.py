@@ -379,6 +379,8 @@ def main() -> None:
                     f"model.preset={model_preset}",
                     *training_overrides,
                     f"training.seed={run_seed}",
+                    f"training.checkpoint_subdir={preset_name}",
+                    "training.checkpoint_subdir_mode=replace_leaf",
                     f"optimizer.name={opt_name}",
                     f"logging.wandb_name={run_id}",
                 ]

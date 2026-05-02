@@ -29,36 +29,48 @@ presets:
     batch_examples: 256
     micro_batch_size: 32
     lr: 1.0e-3
+    overrides:
+      training.save_every: 20000
   - name: moonlight_399m
     params: 3.99e8
     tokens: 8.92e9
     seq_len: 8192
     batch_examples: 96
     lr: 9.503e-4
+    overrides:
+      training.save_every: 11342
   - name: moonlight_545m
     params: 5.45e8
     tokens: 14.04e9
     seq_len: 8192
     batch_examples: 128
     lr: 9.143e-4
+    overrides:
+      training.save_every: 13390
   - name: moonlight_822m
     params: 8.22e8
     tokens: 20.76e9
     seq_len: 8192
     batch_examples: 160
     lr: 8.825e-4
+    overrides:
+      training.save_every: 15839
   - name: moonlight_1_1b
     params: 1.1e9
     tokens: 28.54e9
     seq_len: 8192
     batch_examples: 192
     lr: 8.561e-4
+    overrides:
+      training.save_every: 18146
   - name: moonlight_1_5b
     params: 1.5e9
     tokens: 38.91e9
     seq_len: 8192
     batch_examples: 256
     lr: 8.305e-4
+    overrides:
+      training.save_every: 18554
 
 optimizers:
   - name: adamw
