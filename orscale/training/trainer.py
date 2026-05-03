@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import os
 import time
+from contextlib import nullcontext
 from typing import Any, Iterator
 
 import torch
@@ -132,11 +133,18 @@ class Trainer:
                 input_ids = input_ids.to(self.device, non_blocking=True)
                 targets = targets.to(self.device, non_blocking=True)
 
-                with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=self.use_amp):
-                    output = model(input_ids, targets)
-                    loss = output["loss"] / self.grad_accum_steps
+                sync_gradients = micro_step == self.grad_accum_steps - 1
+                sync_context = (
+                    model.no_sync()
+                    if isinstance(model, DDP) and not sync_gradients
+                    else nullcontext()
+                )
+                with sync_context:
+                    with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=self.use_amp):
+                        output = model(input_ids, targets)
+                        loss = output["loss"] / self.grad_accum_steps
 
-                loss.backward()
+                    loss.backward()
                 total_loss += loss.item()
 
             # --- Gradient clipping (global, on the raw model params) ---

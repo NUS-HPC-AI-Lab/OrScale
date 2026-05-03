@@ -13,6 +13,8 @@ seed_base: 42
 #   grad_accum_steps = batch_examples / (micro_batch_size * world_size)
 #   max_steps        = round(tokens / (batch_examples * seq_len))
 world_size: 8
+# Large-memory 8-GPU default: presets below set per-GPU micro-batches so the
+# paper global batches run with the minimum possible accumulation.
 micro_batch_size: 1
 
 # Rough 8x H20-3E bf16 effective throughput assumption for planning only.
@@ -51,6 +53,7 @@ presets:
     tokens: 8.92e9
     seq_len: 8192
     batch_examples: 96
+    micro_batch_size: 12
     lr: 9.503e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.376e-3
@@ -61,6 +64,7 @@ presets:
     tokens: 14.04e9
     seq_len: 8192
     batch_examples: 128
+    micro_batch_size: 16
     lr: 9.143e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.286e-3
@@ -71,6 +75,7 @@ presets:
     tokens: 20.76e9
     seq_len: 8192
     batch_examples: 160
+    micro_batch_size: 20
     lr: 8.825e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.206e-3
@@ -81,6 +86,7 @@ presets:
     tokens: 28.54e9
     seq_len: 8192
     batch_examples: 192
+    micro_batch_size: 12
     lr: 8.561e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.140e-3
@@ -91,6 +97,7 @@ presets:
     tokens: 38.91e9
     seq_len: 8192
     batch_examples: 256
+    micro_batch_size: 16
     lr: 8.305e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.076e-3
