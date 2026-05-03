@@ -118,7 +118,20 @@ def infer_world_size(cfg: dict, launcher: dict) -> int:
 
 
 def resolve_optimizer_lr(preset: dict, optimizer: dict) -> float | None:
-    """Use optimizer-specific LR when present, otherwise the preset LR."""
+    """Resolve the matrix-group LR for one (preset, optimizer) cell.
+
+    Precedence (highest to lowest):
+      1. ``preset["optimizer_lrs"][optimizer_name]`` -- per-preset, per-optimizer
+         override. Used by strict scaling configs to give a different matrix LR
+         to one optimizer (e.g. uncalibrated ``orscale_muon_moonlight``) without
+         changing the shared per-preset LR used by every other optimizer.
+      2. ``optimizer["lr"]`` -- a single LR for this optimizer across presets.
+      3. ``preset["lr"]`` -- the default per-preset LR shared across optimizers.
+    """
+    opt_name = optimizer.get("name")
+    preset_optimizer_lrs = preset.get("optimizer_lrs") or {}
+    if opt_name is not None and opt_name in preset_optimizer_lrs:
+        return float(preset_optimizer_lrs[opt_name])
     if "lr" in optimizer:
         return float(optimizer["lr"])
     if "lr" in preset:
@@ -126,12 +139,31 @@ def resolve_optimizer_lr(preset: dict, optimizer: dict) -> float | None:
     return None
 
 
-def resolve_optimizer_value(value, *, lr: float | None):
-    """Expand symbolic optimizer config values used by strict scaling configs."""
-    if isinstance(value, str) and value == "same_as_lr":
-        if lr is None:
-            raise ValueError("optimizer value 'same_as_lr' requires an LR")
-        return lr
+def resolve_optimizer_value(value, *, lr: float | None, preset_lr: float | None = None):
+    """Expand symbolic optimizer config values used by strict scaling configs.
+
+    Recognised symbols:
+      - ``"same_as_lr"`` -> resolved matrix-group ``lr`` (after any per-preset
+        per-optimizer override). Use this when an inner sub-optimizer (e.g.
+        AdamW for non-matrix params) should track whatever the matrix LR ended
+        up as.
+      - ``"same_as_preset_lr"`` -> the shared ``preset["lr"]`` *before* any
+        per-optimizer override. Use this when an inner sub-optimizer should
+        stay anchored to the preset LR even though the matrix LR was bumped
+        for one optimizer (e.g. ``adamw_lr`` for the AdamW group of an
+        ``orscale_muon_moonlight`` cell that runs its matrix LR at 3x preset).
+    """
+    if isinstance(value, str):
+        if value == "same_as_lr":
+            if lr is None:
+                raise ValueError("optimizer value 'same_as_lr' requires an LR")
+            return lr
+        if value == "same_as_preset_lr":
+            if preset_lr is None:
+                raise ValueError(
+                    "optimizer value 'same_as_preset_lr' requires a preset LR"
+                )
+            return preset_lr
     return value
 
 
@@ -369,6 +401,7 @@ def main() -> None:
         model_preset = preset.get("model_preset", preset_name)
         params = float(preset["params"])
         tokens = float(preset["tokens"])
+        preset_lr = float(preset["lr"]) if "lr" in preset else None
         training_overrides, training_meta = derive_training_overrides(preset, cfg, launcher)
         for optimizer in optimizers:
             opt_name = optimizer["name"]
@@ -392,7 +425,7 @@ def main() -> None:
                 for k, v in optimizer.items():
                     if k in {"name", "lr"}:
                         continue
-                    resolved = resolve_optimizer_value(v, lr=lr)
+                    resolved = resolve_optimizer_value(v, lr=lr, preset_lr=preset_lr)
                     overrides.append(f"optimizer.{k}={resolved}")
                 for k, v in preset.get("overrides", {}).items():
                     overrides.append(f"{k}={v}")

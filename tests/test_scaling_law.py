@@ -133,6 +133,47 @@ def test_scaling_runner_filters_and_symbolic_lr():
     assert resolve_optimizer_value(optimizer["adamw_lr"], lr=lr) == pytest.approx(lr)
 
 
+def test_resolve_optimizer_lr_honors_preset_optimizer_lrs_override():
+    """``preset.optimizer_lrs[opt]`` should override the shared ``preset.lr``.
+
+    This is how the strict scaling config gives uncalibrated
+    ``orscale_muon_moonlight`` its tuned 3e-3 LR at 125m while keeping every
+    other optimizer at the shared 1e-3 preset LR.
+    """
+    preset = {
+        "name": "fineweb_small_125m",
+        "lr": 1.0e-3,
+        "optimizer_lrs": {"orscale_muon_moonlight": 3.0e-3},
+    }
+    other_optimizer = {"name": "muon_moonlight", "adamw_lr": "same_as_lr"}
+    target_optimizer = {"name": "orscale_muon_moonlight", "adamw_lr": "same_as_preset_lr"}
+
+    other_lr = resolve_optimizer_lr(preset, other_optimizer)
+    target_lr = resolve_optimizer_lr(preset, target_optimizer)
+
+    assert other_lr == pytest.approx(1.0e-3)
+    assert target_lr == pytest.approx(3.0e-3)
+
+
+def test_resolve_optimizer_value_handles_same_as_preset_lr():
+    """``same_as_preset_lr`` should pin the AdamW group to the preset LR even
+    when the matrix-group LR was bumped via ``optimizer_lrs``.
+    """
+    preset_lr = 1.0e-3
+    matrix_lr = 3.0e-3
+
+    same_as_lr = resolve_optimizer_value("same_as_lr", lr=matrix_lr, preset_lr=preset_lr)
+    same_as_preset = resolve_optimizer_value(
+        "same_as_preset_lr", lr=matrix_lr, preset_lr=preset_lr
+    )
+
+    assert same_as_lr == pytest.approx(matrix_lr)
+    assert same_as_preset == pytest.approx(preset_lr)
+
+    with pytest.raises(ValueError, match="preset LR"):
+        resolve_optimizer_value("same_as_preset_lr", lr=matrix_lr, preset_lr=None)
+
+
 def test_runtime_estimate_uses_effective_pflops():
     seconds = estimate_runtime_seconds(
         params=1.25e8,

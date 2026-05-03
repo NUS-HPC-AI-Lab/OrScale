@@ -21,6 +21,19 @@ micro_batch_size: 1
 estimate_pflops_per_second: 0.5
 
 presets:
+  # Per-preset ``lr`` is the shared Moonlight Table 2 LR used by ``adamw``,
+  # ``muon_moonlight``, and ``orscale_muon_moonlight_calibrated`` (the strict
+  # apples-to-apples cells). ``optimizer_lrs`` overrides the matrix-group LR
+  # for one optimizer only -- used here to give uncalibrated
+  # ``orscale_muon_moonlight`` its tuned LR per preset (see report rationale
+  # below). The AdamW group of that optimizer still uses the preset LR via
+  # ``adamw_lr: same_as_preset_lr`` in the optimizer block, matching how the
+  # FineWeb post-fix sweep tuned ``orscale_muon_moonlight @ lr=3e-3``
+  # (matrix=3e-3, AdamW group=1e-3).
+  #
+  # Uncalibrated LR rule of thumb: ~3x preset at 125m (direct evidence in
+  # reports/fineweb_small/), ~2.5x preset at the larger Moonlight scales (no
+  # direct sweep -- extrapolated from CIFAR/DavidNet's 2x and FineWeb's 3x).
   - name: fineweb_small_125m
     model_preset: small
     params: 1.25e8
@@ -29,6 +42,8 @@ presets:
     batch_examples: 256
     micro_batch_size: 32
     lr: 1.0e-3
+    optimizer_lrs:
+      orscale_muon_moonlight: 3.0e-3
     overrides:
       training.save_every: 20000
   - name: moonlight_399m
@@ -37,6 +52,8 @@ presets:
     seq_len: 8192
     batch_examples: 96
     lr: 9.503e-4
+    optimizer_lrs:
+      orscale_muon_moonlight: 2.376e-3
     overrides:
       training.save_every: 11342
   - name: moonlight_545m
@@ -45,6 +62,8 @@ presets:
     seq_len: 8192
     batch_examples: 128
     lr: 9.143e-4
+    optimizer_lrs:
+      orscale_muon_moonlight: 2.286e-3
     overrides:
       training.save_every: 13390
   - name: moonlight_822m
@@ -53,6 +72,8 @@ presets:
     seq_len: 8192
     batch_examples: 160
     lr: 8.825e-4
+    optimizer_lrs:
+      orscale_muon_moonlight: 2.206e-3
     overrides:
       training.save_every: 15839
   - name: moonlight_1_1b
@@ -61,6 +82,8 @@ presets:
     seq_len: 8192
     batch_examples: 192
     lr: 8.561e-4
+    optimizer_lrs:
+      orscale_muon_moonlight: 2.140e-3
     overrides:
       training.save_every: 18146
   - name: moonlight_1_5b
@@ -69,26 +92,38 @@ presets:
     seq_len: 8192
     batch_examples: 256
     lr: 8.305e-4
+    optimizer_lrs:
+      orscale_muon_moonlight: 2.076e-3
     overrides:
       training.save_every: 18554
 
+# Moonlight uses AdamW betas ``(0.9, 0.95)`` for its dense-LM baselines
+# (arXiv:2502.16982). Both the standalone ``adamw`` row and the AdamW group
+# of every Muon-family variant inherit those betas here.
 optimizers:
   - name: adamw
     weight_decay: 0.1
+    betas: [0.9, 0.95]
   - name: muon_moonlight
     weight_decay: 0.1
     adamw_lr: same_as_lr
     adamw_weight_decay: 0.1
+    adamw_betas: [0.9, 0.95]
   - name: orscale_muon_moonlight
     weight_decay: 0.1
-    adamw_lr: same_as_lr
+    # Matrix LR is overridden per preset via ``optimizer_lrs`` above. The
+    # AdamW group stays anchored to the preset LR to mirror the FineWeb
+    # post-fix sweep that tuned this variant.
+    adamw_lr: same_as_preset_lr
     adamw_weight_decay: 0.1
+    adamw_betas: [0.9, 0.95]
     r_min: 0.1
     r_max: 5.0
   - name: orscale_muon_moonlight_calibrated
     weight_decay: 0.1
     adamw_lr: same_as_lr
     adamw_weight_decay: 0.1
+    adamw_betas: [0.9, 0.95]
     r_min: 0.1
     r_max: 5.0
 
