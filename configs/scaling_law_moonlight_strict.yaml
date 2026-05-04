@@ -1,8 +1,31 @@
 # Strict Moonlight Table 2 scaling-law comparison.
 #
 # Primary goal: compare optimizer families without changing model size, token
-# budget, learning rate, weight decay, or global batch across optimizers.
-# Paper batch is measured in examples at 8K context length.
+# budget, learning rate, weight decay, or global batch (in tokens) across
+# optimizers. Paper batch is measured in examples at 8K context length.
+#
+# Memory deviation from Moonlight (545m and above):
+#   On 8x H20-3E (96 GB), the paper's seq_len=8192 with the listed
+#   micro-batches OOMs from per-layer activation memory (DDP + bf16 + FlashSDPA,
+#   no activation checkpointing). To keep the run tractable without changing
+#   tokens-per-batch, max_steps, or LR, we shorten seq_len to 4096 and double
+#   batch_examples for moonlight_545m / 822m / 1_1b / 1_5b.
+#
+#   Why this is safe for cross-optimizer comparison:
+#     * tokens/batch is unchanged -> max_steps unchanged, total compute budget
+#       unchanged, LR/WD schedule re-uses Moonlight's tuned per-scale values
+#       (gradient noise scale in tokens dominates LR scaling; doubling
+#       examples-per-batch is a sub-decimal shift not worth resweeping).
+#     * Every optimizer in the matrix sees the same shortened seq_len, so the
+#       optimizer ranking (the actual deliverable) is unaffected.
+#
+#   Why loss values are NOT directly comparable to Moonlight Table 2 at 545m+:
+#     Shorter context produces systematically lower per-token loss (less
+#     out-of-document noise, easier next-token prediction). The scaling-law
+#     fit constants (A, B, alpha, beta) will shift accordingly. This is an
+#     accepted trade-off for the optimizer-comparison goal of this experiment.
+#
+#   125m and 399m are unchanged (125m already at 1024; 399m fits at 8192).
 
 base_config: configs/small_125m.yaml
 output_dir: results/moonlight_scaling_strict
@@ -59,12 +82,15 @@ presets:
       orscale_muon_moonlight: 2.376e-3
     overrides:
       training.save_every: 11342
+  # 545m+: seq_len shortened from 8192 -> 4096, batch_examples doubled to
+  # keep tokens/batch (and therefore max_steps and LR schedule) invariant.
+  # See header comment for rationale.
   - name: moonlight_545m
     params: 5.45e8
     tokens: 14.04e9
-    seq_len: 8192
-    batch_examples: 128
-    micro_batch_size: 16
+    seq_len: 4096
+    batch_examples: 256
+    micro_batch_size: 16   # accum = 256/(16*8) = 2; activations ~30 GB
     lr: 9.143e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.286e-3
@@ -73,9 +99,9 @@ presets:
   - name: moonlight_822m
     params: 8.22e8
     tokens: 20.76e9
-    seq_len: 8192
-    batch_examples: 160
-    micro_batch_size: 20
+    seq_len: 4096
+    batch_examples: 320
+    micro_batch_size: 20   # accum = 320/(20*8) = 2; activations ~48 GB
     lr: 8.825e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.206e-3
@@ -84,9 +110,9 @@ presets:
   - name: moonlight_1_1b
     params: 1.1e9
     tokens: 28.54e9
-    seq_len: 8192
-    batch_examples: 192
-    micro_batch_size: 12
+    seq_len: 4096
+    batch_examples: 384
+    micro_batch_size: 16   # accum = 384/(16*8) = 3; activations ~49 GB
     lr: 8.561e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.140e-3
@@ -95,9 +121,11 @@ presets:
   - name: moonlight_1_5b
     params: 1.5e9
     tokens: 38.91e9
-    seq_len: 8192
-    batch_examples: 256
-    micro_batch_size: 16
+    seq_len: 4096
+    batch_examples: 512
+    micro_batch_size: 8    # accum = 512/(8*8) = 8; activations ~30 GB
+                           # mbs=16 (~60 GB activations) is risky w/ 1.5B
+                           # weights+optimizer state on 96 GB; bump if headroom.
     lr: 8.305e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.076e-3
