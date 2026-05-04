@@ -38,14 +38,19 @@ CONDA_ENV="${CONDA_ENV:-orscale}"
 # --- Memory & NCCL stability env (critical for 545m+ on 96 GB H20-3E) ---
 # expandable_segments: lets the CUDA caching allocator grow segments in place
 #   instead of needing contiguous chunks. Eliminates the fragmentation-induced
-#   OOM/hang flakiness from Newton-Schulz dynamic allocations + torch.compile
-#   when running near the memory ceiling. Available since PyTorch 2.1.
-# max_split_size_mb: prevents the allocator from splitting large blocks into
-#   small ones that later can't be coalesced.
+#   OOM/hang flakiness from Newton-Schulz dynamic allocations near the memory
+#   ceiling. Available since PyTorch 2.1.
+#
+# NOTE: We deliberately do NOT set max_split_size_mb here. Combining it with
+# expandable_segments can pessimize the allocator under heavy dynamic alloc
+# (NS workspaces, torch.compile workspaces) and was empirically associated
+# with a ~2.5x throughput regression at 545m. expandable_segments:True alone
+# is sufficient for the fragmentation problem.
+#
 # NCCL settings: surface hangs as errors instead of silently waiting forever
-#   when one rank stalls in a long opt.step or compile pass while others wait
-#   at an all-reduce barrier (this is the "stuck at step 30" failure mode).
-export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True,max_split_size_mb:512}"
+# when one rank stalls in a long opt.step while others wait at an all-reduce
+# barrier (this is the "stuck at step 30" failure mode).
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 export TORCH_NCCL_ASYNC_ERROR_HANDLING="${TORCH_NCCL_ASYNC_ERROR_HANDLING:-1}"
 export TORCH_NCCL_BLOCKING_WAIT="${TORCH_NCCL_BLOCKING_WAIT:-0}"
 # Generous watchdog so a slow first opt.step (NS compile + alloc) doesn't
@@ -104,11 +109,16 @@ fi
 
 echo "============================================================"
 echo " Moonlight strict scaling run"
-echo "   config    : $CONFIG"
-echo "   optimizer : ${OPTIMIZER:-all}"
-echo "   presets   : ${PRESETS:-all}"
-echo "   dry-run   : $DRY_RUN"
-echo "   skip train: $SKIP_TRAINING"
+echo "   config         : $CONFIG"
+echo "   optimizer      : ${OPTIMIZER:-all}"
+echo "   presets        : ${PRESETS:-all}"
+echo "   dry-run        : $DRY_RUN"
+echo "   skip train     : $SKIP_TRAINING"
+echo " Memory/NCCL env (effective values):"
+echo "   PYTORCH_CUDA_ALLOC_CONF=$PYTORCH_CUDA_ALLOC_CONF"
+echo "   TORCH_NCCL_ASYNC_ERROR_HANDLING=$TORCH_NCCL_ASYNC_ERROR_HANDLING"
+echo "   TORCH_NCCL_BLOCKING_WAIT=$TORCH_NCCL_BLOCKING_WAIT"
+echo "   TORCH_NCCL_TIMEOUT_MS=$TORCH_NCCL_TIMEOUT_MS"
 echo "============================================================"
 echo "${cmd[*]}"
 echo
