@@ -53,12 +53,36 @@ class Trainer:
         self.config = config or {}
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Wrap model in DDP if distributed
+        # Move model to device and keep a raw, unwrapped reference for
+        # state_dict / parameter iteration. This stays valid regardless of
+        # any subsequent torch.compile or DDP wrapping; the optimizer was
+        # built against these same Parameter tensors before the Trainer
+        # was constructed.
         self.model = model.to(self.device)
+        self.raw_model = self.model
+
+        # Optional torch.compile of the full model. Compiled module wraps the
+        # raw nn.Module transparently (params and buffers are shared with
+        # ``self.raw_model``). We compile BEFORE DDP so DDP's gradient sync
+        # hooks observe the compiled forward graph and so ``model.no_sync()``
+        # remains accessible on the outer DDP wrapper.
+        compile_cfg = self.config.get("compile")
+        if compile_cfg:
+            compile_kwargs: dict[str, Any] = (
+                dict(compile_cfg) if isinstance(compile_cfg, dict) else {}
+            )
+            # Static shapes for transformer training: avoids recompilation on
+            # every shape change (e.g. last batch's truncated micro-batch).
+            compile_kwargs.setdefault("dynamic", False)
+            # ``mode="reduce-overhead"`` enables CUDA graphs, which conflicts
+            # with DDP's gradient bucketing. Stick to the default mode unless
+            # the user explicitly asks otherwise.
+            self.model = torch.compile(self.model, **compile_kwargs)
+
+        # Wrap model in DDP if distributed.
         if get_world_size() > 1:
             local_rank = int(os.environ.get("LOCAL_RANK", 0))
             self.model = DDP(self.model, device_ids=[local_rank])
-        self.raw_model = self.model.module if isinstance(self.model, DDP) else self.model
 
         self.optimizers = optimizers if isinstance(optimizers, list) else [optimizers]
         self.scheduler = scheduler

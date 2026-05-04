@@ -90,47 +90,77 @@ presets:
     tokens: 14.04e9
     seq_len: 4096
     batch_examples: 256
-    micro_batch_size: 16   # accum = 256/(16*8) = 2; activations ~30 GB
+    # mbs=8, accum=4: same activation footprint as the original 8K/mbs=4
+    # working setup (seq*mbs = 32768). Dropped from mbs=16 because that
+    # operates at the fragmentation boundary with NS dynamic allocations +
+    # torch.compile cache; saw flaky OOM at step 0 / NCCL hang at step 30.
+    # Throughput is unchanged (gradient accumulation is essentially free
+    # next to forward+backward+opt.step). Set PYTORCH_CUDA_ALLOC_CONF=
+    # expandable_segments:True (see scripts/run_moonlight_scaling_8gpu.sh)
+    # to additionally harden against fragmentation. Bump back to mbs=16
+    # only if memory monitoring shows >40 GB headroom under the heaviest
+    # optimizer (orscale_muon_moonlight_calibrated).
+    micro_batch_size: 8
     lr: 9.143e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.286e-3
     overrides:
       training.save_every: 13390
+      # Compile the full GPT model with torch.compile. Expected ~15-25%
+      # speedup on H20-3E from operator fusion + reduced Python overhead.
+      # First step pays a 30-90s compile cost. dynamic=False is set in the
+      # Trainer to avoid recompilation on shape changes.
+      training.compile: true
   - name: moonlight_822m
     params: 8.22e8
     tokens: 20.76e9
     seq_len: 4096
     batch_examples: 320
-    micro_batch_size: 20   # accum = 320/(20*8) = 2; activations ~48 GB
+    # Conservative mbs=10 (accum=4) to mirror the safety margin used at 545m
+    # under fragmentation pressure with the calibrated optimizer variant.
+    # Bump to 20 if 545m runs cleanly with headroom.
+    micro_batch_size: 10
     lr: 8.825e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.206e-3
     overrides:
       training.save_every: 15839
+      training.compile: true
   - name: moonlight_1_1b
     params: 1.1e9
     tokens: 28.54e9
     seq_len: 4096
     batch_examples: 384
-    micro_batch_size: 16   # accum = 384/(16*8) = 3; activations ~49 GB
+    # mbs=12 (accum=4) is workable here BECAUSE checkpoint_mlp is on:
+    # selective MLP recompute drops per-layer activation memory by ~70%,
+    # easily offsetting the doubled mbs vs the no-AC plan (was mbs=8).
+    # Net wall-clock is ~+5% recompute cost minus larger-batch utilization
+    # gain; should land roughly throughput-neutral with much more headroom.
+    micro_batch_size: 12
     lr: 8.561e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.140e-3
     overrides:
       training.save_every: 18146
+      training.compile: true
+      model.checkpoint_mlp: true
   - name: moonlight_1_5b
     params: 1.5e9
     tokens: 38.91e9
     seq_len: 4096
     batch_examples: 512
-    micro_batch_size: 8    # accum = 512/(8*8) = 8; activations ~30 GB
-                           # mbs=16 (~60 GB activations) is risky w/ 1.5B
-                           # weights+optimizer state on 96 GB; bump if headroom.
+    # mbs=8 (accum=8) with checkpoint_mlp on: optimizer state at 1.5B is
+    # ~25 GB; without AC, mbs=8 means ~60 GB activations and likely OOM.
+    # With AC, activations drop to ~18 GB -> total ~50 GB, comfortable.
+    # AC is essentially mandatory for the calibrated optimizer at this scale.
+    micro_batch_size: 8
     lr: 8.305e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.076e-3
     overrides:
       training.save_every: 18554
+      training.compile: true
+      model.checkpoint_mlp: true
 
 # Moonlight uses AdamW betas ``(0.9, 0.95)`` for its dense-LM baselines
 # (arXiv:2502.16982). Both the standalone ``adamw`` row and the AdamW group

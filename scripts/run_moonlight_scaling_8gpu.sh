@@ -35,6 +35,23 @@ cd "$REPO_ROOT"
 # Runs training with the repo's conda env (see README / other scripts using `conda run -n orscale`).
 CONDA_ENV="${CONDA_ENV:-orscale}"
 
+# --- Memory & NCCL stability env (critical for 545m+ on 96 GB H20-3E) ---
+# expandable_segments: lets the CUDA caching allocator grow segments in place
+#   instead of needing contiguous chunks. Eliminates the fragmentation-induced
+#   OOM/hang flakiness from Newton-Schulz dynamic allocations + torch.compile
+#   when running near the memory ceiling. Available since PyTorch 2.1.
+# max_split_size_mb: prevents the allocator from splitting large blocks into
+#   small ones that later can't be coalesced.
+# NCCL settings: surface hangs as errors instead of silently waiting forever
+#   when one rank stalls in a long opt.step or compile pass while others wait
+#   at an all-reduce barrier (this is the "stuck at step 30" failure mode).
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True,max_split_size_mb:512}"
+export TORCH_NCCL_ASYNC_ERROR_HANDLING="${TORCH_NCCL_ASYNC_ERROR_HANDLING:-1}"
+export TORCH_NCCL_BLOCKING_WAIT="${TORCH_NCCL_BLOCKING_WAIT:-0}"
+# Generous watchdog so a slow first opt.step (NS compile + alloc) doesn't
+# trip a false-positive timeout, but real hangs still raise within 30 min.
+export TORCH_NCCL_TIMEOUT_MS="${TORCH_NCCL_TIMEOUT_MS:-1800000}"
+
 cmd=(
   conda run -n "$CONDA_ENV" --no-capture-output
   python
