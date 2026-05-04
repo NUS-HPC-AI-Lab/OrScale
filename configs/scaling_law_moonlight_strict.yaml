@@ -106,11 +106,16 @@ presets:
       orscale_muon_moonlight: 2.286e-3
     overrides:
       training.save_every: 13390
-      # Compile the full GPT model with torch.compile. Expected ~15-25%
-      # speedup on H20-3E from operator fusion + reduced Python overhead.
-      # First step pays a 30-90s compile cost. dynamic=False is set in the
-      # Trainer to avoid recompilation on shape changes.
-      training.compile: true
+      # torch.compile DISABLED for this scale: empirically tested at 545m
+      # and gave ~110k tok/s steady-state vs ~165k eager (33% regression).
+      # Likely root cause: H20-3E is bandwidth-constrained and the model
+      # already uses fused F.scaled_dot_product_attention / F.rms_norm,
+      # leaving little room for compile-driven fusion. Combined with bf16
+      # autocast + DDP bucket scheduling and the calibrated optimizer's
+      # per-step .item() host syncs for diagnostics, the compiled
+      # scheduling is slightly worse than eager. Revisit only if
+      # diagnostics are disabled or the optimizer changes substantially.
+      # training.compile: true
   - name: moonlight_822m
     params: 8.22e8
     tokens: 20.76e9
@@ -125,7 +130,7 @@ presets:
       orscale_muon_moonlight: 2.206e-3
     overrides:
       training.save_every: 15839
-      training.compile: true
+      # training.compile: true  # disabled -- see 545m note above
   - name: moonlight_1_1b
     params: 1.1e9
     tokens: 28.54e9
@@ -142,7 +147,7 @@ presets:
       orscale_muon_moonlight: 2.140e-3
     overrides:
       training.save_every: 18146
-      training.compile: true
+      # training.compile: true  # disabled -- see 545m note above
       model.checkpoint_mlp: true
   - name: moonlight_1_5b
     params: 1.5e9
@@ -159,7 +164,7 @@ presets:
       orscale_muon_moonlight: 2.076e-3
     overrides:
       training.save_every: 18554
-      training.compile: true
+      # training.compile: true  # disabled -- see 545m note above
       model.checkpoint_mlp: true
 
 # Moonlight uses AdamW betas ``(0.9, 0.95)`` for its dense-LM baselines
