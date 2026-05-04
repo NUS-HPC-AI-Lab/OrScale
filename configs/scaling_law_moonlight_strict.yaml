@@ -106,16 +106,14 @@ presets:
       orscale_muon_moonlight: 2.286e-3
     overrides:
       training.save_every: 13390
-      # torch.compile DISABLED for this scale: empirically tested at 545m
-      # and gave ~110k tok/s steady-state vs ~165k eager (33% regression).
-      # Likely root cause: H20-3E is bandwidth-constrained and the model
-      # already uses fused F.scaled_dot_product_attention / F.rms_norm,
-      # leaving little room for compile-driven fusion. Combined with bf16
-      # autocast + DDP bucket scheduling and the calibrated optimizer's
-      # per-step .item() host syncs for diagnostics, the compiled
-      # scheduling is slightly worse than eager. Revisit only if
-      # diagnostics are disabled or the optimizer changes substantially.
-      # training.compile: true
+      # Confirmed 195k tok/s at 545m (vs 141.5k pre-changes, +38%).
+      # Compile speedup is real once the allocator config is right:
+      # PYTORCH_CUDA_ALLOC_CONF must be exactly "expandable_segments:True"
+      # WITHOUT max_split_size_mb (the latter pessimizes both expandable
+      # segments and torch.compile workspace allocation). The earlier
+      # 110k-with-compile regression was caused by max_split_size_mb:512
+      # in the env, not by compile itself.
+      training.compile: true
   - name: moonlight_822m
     params: 8.22e8
     tokens: 20.76e9
@@ -130,7 +128,7 @@ presets:
       orscale_muon_moonlight: 2.206e-3
     overrides:
       training.save_every: 15839
-      # training.compile: true  # disabled -- see 545m note above
+      training.compile: true
   - name: moonlight_1_1b
     params: 1.1e9
     tokens: 28.54e9
@@ -147,7 +145,7 @@ presets:
       orscale_muon_moonlight: 2.140e-3
     overrides:
       training.save_every: 18146
-      # training.compile: true  # disabled -- see 545m note above
+      training.compile: true
       model.checkpoint_mlp: true
   - name: moonlight_1_5b
     params: 1.5e9
@@ -164,7 +162,7 @@ presets:
       orscale_muon_moonlight: 2.076e-3
     overrides:
       training.save_every: 18554
-      # training.compile: true  # disabled -- see 545m note above
+      training.compile: true
       model.checkpoint_mlp: true
 
 # Moonlight uses AdamW betas ``(0.9, 0.95)`` for its dense-LM baselines
