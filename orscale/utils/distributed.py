@@ -30,7 +30,7 @@ def setup_distributed() -> tuple[int, int, torch.device]:
         torch.cuda.set_device(device)
 
         dist.init_process_group(backend="nccl")
-        dist.barrier()
+        dist.barrier(device_ids=[local_rank])
         return rank, world_size, device
 
     # Single-process fallback

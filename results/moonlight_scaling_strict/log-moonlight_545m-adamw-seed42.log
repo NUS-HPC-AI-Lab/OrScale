@@ -1,0 +1,894 @@
+W0505 14:40:41.871000 226920 site-packages/torch/distributed/run.py:793] 
+W0505 14:40:41.871000 226920 site-packages/torch/distributed/run.py:793] *****************************************
+W0505 14:40:41.871000 226920 site-packages/torch/distributed/run.py:793] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0505 14:40:41.871000 226920 site-packages/torch/distributed/run.py:793] *****************************************
+[W505 14:40:51.632888850 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+[W505 14:40:52.056438954 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+[rank6]:[W505 14:40:52.163204186 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 6]  using GPU 6 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[W505 14:40:52.221262519 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+[W505 14:40:52.245834739 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+[rank2]:[W505 14:40:52.311481447 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 2]  using GPU 2 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[rank7]:[W505 14:40:52.352874745 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 7]  using GPU 7 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[W505 14:40:52.358021029 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+[W505 14:40:52.415386083 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+[rank1]:[W505 14:40:52.427200654 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 1]  using GPU 1 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[rank3]:[W505 14:40:52.456169701 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 3]  using GPU 3 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[rank0]:[W505 14:40:52.459440740 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 0]  using GPU 0 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[W505 14:40:52.526556748 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+[W505 14:40:52.536998316 CUDAAllocatorConfig.h:28] Warning: expandable_segments not supported on this platform (function operator())
+[rank5]:[W505 14:40:52.547144880 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 5]  using GPU 5 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+[rank4]:[W505 14:40:52.572092843 ProcessGroupNCCL.cpp:4115] [PG ID 0 PG GUID 0 Rank 4]  using GPU 4 to perform barrier as devices used by this process are currently unknown. This can potentially cause a hang if this rank to GPU mapping is incorrect.Specify device_ids in barrier() to force use of a particular device,or call init_process_group() with a device_id.
+2026-05-05 14:40:56 | INFO | World size: 8, Device: cuda:0
+wandb: Loading settings from /ossfs/workspace/OrScale/wandb/settings
+wandb: Tracking run with wandb version 0.26.1
+wandb: W&B syncing is set to `offline` in this directory. Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+wandb: Run data is saved locally in /ossfs/workspace/OrScale/wandb/offline-run-20260505_144057-sj7jbd3n
+2026-05-05 14:41:01 | INFO | Building model...
+2026-05-05 14:41:07 | INFO | Model: 629.7M parameters
+2026-05-05 14:41:07 | INFO | Building optimizer(s): adamw
+2026-05-05 14:41:07 | INFO | Building scheduler...
+2026-05-05 14:41:07 | INFO | Building training data loader...
+2026-05-05 14:41:07 | INFO | Building validation data loader...
+2026-05-05 14:41:08 | INFO | Launching training run
+2026-05-05 14:41:08 | INFO |   config: configs/small_125m.yaml
+2026-05-05 14:41:08 | INFO |   overrides: ['model.preset=moonlight_545m', 'model.max_seq_len=4096', 'training.batch_size=16', 'training.grad_accum_steps=2', 'training.max_steps=13390', 'training.seed=42', 'training.checkpoint_subdir=moonlight_545m/adamw', 'training.checkpoint_subdir_mode=replace_leaf', 'optimizer.name=adamw', 'logging.wandb_name=moonlight_545m-adamw-seed42', 'optimizer.lr=0.0009143', 'optimizer.weight_decay=0.1', 'optimizer.betas=[0.9, 0.95]', 'training.save_every=13390', 'training.compile=True']
+2026-05-05 14:41:08 | INFO |   distributed: rank=0 local_rank=0 world_size=8 device=cuda:0
+2026-05-05 14:41:08 | INFO |   seed: base=42 effective_rank_seed=42 precision=bfloat16
+2026-05-05 14:41:08 | INFO |   model: preset=moonlight_545m seq_len=4096 norm=rmsnorm mlp=relusqr pos=rope tie_weights=True
+2026-05-05 14:41:08 | INFO |   optimizer: name=adamw optimizers=1 lr=0.0009143 weight_decay=0.1 momentum=0.95
+2026-05-05 14:41:08 | INFO |   schedule: max_steps=13390 warmup_steps=1000 grad_accum=2 tokens/step=1,048,576
+2026-05-05 14:41:08 | INFO |   training cadence: log_every=10 val_every=500 val_steps=20 save_every=13390
+2026-05-05 14:41:08 | INFO |   data(train): in-memory .bin shards (103 files) from /mnt/dllm/ruilai/dataset/fineweb10B/fineweb_train_*.bin
+2026-05-05 14:41:08 | INFO |   data(val): in-memory .bin shards (1 files) from /mnt/dllm/ruilai/dataset/fineweb10B/fineweb_val_*.bin
+2026-05-05 14:41:08 | INFO |   loaders: train=DataLoader val=DataLoader
+2026-05-05 14:41:08 | INFO |   diagnostics: log_every=50 heavy_log_every=500
+2026-05-05 14:41:08 | INFO |   wandb: enabled (project=orscale-fineweb10B, group=small_125m)
+2026-05-05 14:41:08 | INFO | Starting training loop...
+step 10/13390 | loss 10.1635 | lr_mult 0.0100 | tok/s 169437 | grad_norm 7.833
+step 20/13390 | loss 8.8382 | lr_mult 0.0200 | tok/s 185966 | grad_norm 1.898
+step 30/13390 | loss 8.4113 | lr_mult 0.0300 | tok/s 192401 | grad_norm 2.080
+step 40/13390 | loss 7.9695 | lr_mult 0.0400 | tok/s 195797 | grad_norm 5.524
+step 50/13390 | loss 7.5889 | lr_mult 0.0500 | tok/s 197893 | grad_norm 2.606
+step 60/13390 | loss 7.2847 | lr_mult 0.0600 | tok/s 199315 | grad_norm 2.027
+step 70/13390 | loss 7.0418 | lr_mult 0.0700 | tok/s 200340 | grad_norm 1.669
+step 80/13390 | loss 6.9276 | lr_mult 0.0800 | tok/s 201111 | grad_norm 2.140
+step 90/13390 | loss 6.7888 | lr_mult 0.0900 | tok/s 201720 | grad_norm 2.329
+step 100/13390 | loss 6.7036 | lr_mult 0.1000 | tok/s 202211 | grad_norm 1.473
+step 110/13390 | loss 6.5554 | lr_mult 0.1100 | tok/s 202617 | grad_norm 2.113
+step 120/13390 | loss 6.4972 | lr_mult 0.1200 | tok/s 202956 | grad_norm 1.605
+step 130/13390 | loss 6.4056 | lr_mult 0.1300 | tok/s 203242 | grad_norm 1.377
+step 140/13390 | loss 6.3445 | lr_mult 0.1400 | tok/s 203492 | grad_norm 1.345
+step 150/13390 | loss 6.3199 | lr_mult 0.1500 | tok/s 203708 | grad_norm 1.577
+step 160/13390 | loss 6.2559 | lr_mult 0.1600 | tok/s 203896 | grad_norm 1.669
+step 170/13390 | loss 6.1981 | lr_mult 0.1700 | tok/s 204066 | grad_norm 1.476
+step 180/13390 | loss 6.1143 | lr_mult 0.1800 | tok/s 204215 | grad_norm 1.175
+step 190/13390 | loss 6.0655 | lr_mult 0.1900 | tok/s 204350 | grad_norm 1.183
+step 200/13390 | loss 6.0192 | lr_mult 0.2000 | tok/s 204468 | grad_norm 1.143
+step 210/13390 | loss 5.9852 | lr_mult 0.2100 | tok/s 204576 | grad_norm 1.955
+step 220/13390 | loss 5.9116 | lr_mult 0.2200 | tok/s 204674 | grad_norm 1.353
+step 230/13390 | loss 5.8682 | lr_mult 0.2300 | tok/s 204764 | grad_norm 1.286
+step 240/13390 | loss 5.8341 | lr_mult 0.2400 | tok/s 204850 | grad_norm 1.690
+step 250/13390 | loss 5.7286 | lr_mult 0.2500 | tok/s 204925 | grad_norm 1.452
+step 260/13390 | loss 5.6750 | lr_mult 0.2600 | tok/s 204994 | grad_norm 1.140
+step 270/13390 | loss 5.6739 | lr_mult 0.2700 | tok/s 205059 | grad_norm 1.861
+step 280/13390 | loss 5.6717 | lr_mult 0.2800 | tok/s 205119 | grad_norm 1.596
+step 290/13390 | loss 5.6264 | lr_mult 0.2900 | tok/s 205176 | grad_norm 1.103
+step 300/13390 | loss 5.5820 | lr_mult 0.3000 | tok/s 205232 | grad_norm 1.119
+step 310/13390 | loss 5.5081 | lr_mult 0.3100 | tok/s 205284 | grad_norm 1.144
+step 320/13390 | loss 5.4555 | lr_mult 0.3200 | tok/s 205333 | grad_norm 1.816
+step 330/13390 | loss 5.4489 | lr_mult 0.3300 | tok/s 205375 | grad_norm 1.495
+step 340/13390 | loss 5.4218 | lr_mult 0.3400 | tok/s 205417 | grad_norm 1.146
+step 350/13390 | loss 5.3997 | lr_mult 0.3500 | tok/s 205456 | grad_norm 1.728
+step 360/13390 | loss 5.3382 | lr_mult 0.3600 | tok/s 205493 | grad_norm 0.897
+step 370/13390 | loss 5.2992 | lr_mult 0.3700 | tok/s 205528 | grad_norm 0.908
+step 380/13390 | loss 5.2549 | lr_mult 0.3800 | tok/s 205563 | grad_norm 0.881
+step 390/13390 | loss 5.2068 | lr_mult 0.3900 | tok/s 205595 | grad_norm 1.320
+step 400/13390 | loss 5.1845 | lr_mult 0.4000 | tok/s 205624 | grad_norm 1.106
+step 410/13390 | loss 5.1651 | lr_mult 0.4100 | tok/s 205655 | grad_norm 0.723
+step 420/13390 | loss 5.1255 | lr_mult 0.4200 | tok/s 205682 | grad_norm 1.327
+step 430/13390 | loss 5.1378 | lr_mult 0.4300 | tok/s 205707 | grad_norm 1.078
+step 440/13390 | loss 5.0566 | lr_mult 0.4400 | tok/s 205733 | grad_norm 0.646
+step 450/13390 | loss 5.0268 | lr_mult 0.4500 | tok/s 205755 | grad_norm 1.010
+step 460/13390 | loss 5.0042 | lr_mult 0.4600 | tok/s 205778 | grad_norm 0.859
+step 470/13390 | loss 4.9828 | lr_mult 0.4700 | tok/s 205800 | grad_norm 0.863
+step 480/13390 | loss 4.9378 | lr_mult 0.4800 | tok/s 205821 | grad_norm 0.949
+step 490/13390 | loss 4.9159 | lr_mult 0.4900 | tok/s 205842 | grad_norm 0.728
+step 500/13390 | loss 4.8733 | lr_mult 0.5000 | tok/s 205863 | grad_norm 1.082
+step 500/13390 | val_loss 4.9015
+step 510/13390 | loss 4.9084 | lr_mult 0.5100 | tok/s 204336 | grad_norm 0.742
+step 520/13390 | loss 4.8298 | lr_mult 0.5200 | tok/s 204383 | grad_norm 0.769
+step 530/13390 | loss 4.8186 | lr_mult 0.5300 | tok/s 204428 | grad_norm 0.809
+step 540/13390 | loss 4.8027 | lr_mult 0.5400 | tok/s 204471 | grad_norm 0.735
+step 550/13390 | loss 4.7598 | lr_mult 0.5500 | tok/s 204514 | grad_norm 0.640
+step 560/13390 | loss 4.7619 | lr_mult 0.5600 | tok/s 204555 | grad_norm 0.740
+step 570/13390 | loss 4.6868 | lr_mult 0.5700 | tok/s 204595 | grad_norm 0.904
+step 580/13390 | loss 4.6840 | lr_mult 0.5800 | tok/s 204634 | grad_norm 0.759
+step 590/13390 | loss 4.6373 | lr_mult 0.5900 | tok/s 204671 | grad_norm 0.604
+step 600/13390 | loss 4.6101 | lr_mult 0.6000 | tok/s 204707 | grad_norm 0.849
+step 610/13390 | loss 4.5951 | lr_mult 0.6100 | tok/s 204741 | grad_norm 0.945
+step 620/13390 | loss 4.5906 | lr_mult 0.6200 | tok/s 204773 | grad_norm 0.589
+step 630/13390 | loss 4.4868 | lr_mult 0.6300 | tok/s 204806 | grad_norm 0.589
+step 640/13390 | loss 4.5211 | lr_mult 0.6400 | tok/s 204838 | grad_norm 0.827
+step 650/13390 | loss 4.5328 | lr_mult 0.6500 | tok/s 204867 | grad_norm 0.797
+step 660/13390 | loss 4.5054 | lr_mult 0.6600 | tok/s 204897 | grad_norm 0.592
+step 670/13390 | loss 4.4380 | lr_mult 0.6700 | tok/s 204926 | grad_norm 0.392
+step 680/13390 | loss 4.3761 | lr_mult 0.6800 | tok/s 204954 | grad_norm 0.523
+step 690/13390 | loss 4.3988 | lr_mult 0.6900 | tok/s 204981 | grad_norm 0.802
+step 700/13390 | loss 4.4528 | lr_mult 0.7000 | tok/s 205008 | grad_norm 1.194
+step 710/13390 | loss 4.4470 | lr_mult 0.7100 | tok/s 205034 | grad_norm 0.601
+step 720/13390 | loss 4.3325 | lr_mult 0.7200 | tok/s 205059 | grad_norm 0.487
+step 730/13390 | loss 4.2973 | lr_mult 0.7300 | tok/s 205083 | grad_norm 0.547
+step 740/13390 | loss 4.3469 | lr_mult 0.7400 | tok/s 205106 | grad_norm 0.860
+step 750/13390 | loss 4.3140 | lr_mult 0.7500 | tok/s 205130 | grad_norm 0.629
+step 760/13390 | loss 4.2725 | lr_mult 0.7600 | tok/s 205152 | grad_norm 0.447
+step 770/13390 | loss 4.2246 | lr_mult 0.7700 | tok/s 205174 | grad_norm 0.550
+step 780/13390 | loss 4.3125 | lr_mult 0.7800 | tok/s 205195 | grad_norm 0.641
+step 790/13390 | loss 4.3351 | lr_mult 0.7900 | tok/s 205216 | grad_norm 0.496
+step 800/13390 | loss 4.2525 | lr_mult 0.8000 | tok/s 205235 | grad_norm 0.557
+step 810/13390 | loss 4.1930 | lr_mult 0.8100 | tok/s 205255 | grad_norm 0.493
+step 820/13390 | loss 4.1778 | lr_mult 0.8200 | tok/s 205274 | grad_norm 0.620
+step 830/13390 | loss 4.1532 | lr_mult 0.8300 | tok/s 205292 | grad_norm 0.437
+step 840/13390 | loss 4.1640 | lr_mult 0.8400 | tok/s 205310 | grad_norm 0.479
+step 850/13390 | loss 4.1876 | lr_mult 0.8500 | tok/s 205328 | grad_norm 0.584
+step 860/13390 | loss 4.1363 | lr_mult 0.8600 | tok/s 205345 | grad_norm 0.527
+step 870/13390 | loss 4.1230 | lr_mult 0.8700 | tok/s 205362 | grad_norm 0.434
+step 880/13390 | loss 4.0805 | lr_mult 0.8800 | tok/s 205378 | grad_norm 0.565
+step 890/13390 | loss 4.0777 | lr_mult 0.8900 | tok/s 205394 | grad_norm 0.506
+step 900/13390 | loss 4.0856 | lr_mult 0.9000 | tok/s 205410 | grad_norm 0.336
+step 910/13390 | loss 4.0899 | lr_mult 0.9100 | tok/s 205425 | grad_norm 0.490
+step 920/13390 | loss 4.0491 | lr_mult 0.9200 | tok/s 205441 | grad_norm 0.378
+step 930/13390 | loss 4.0197 | lr_mult 0.9300 | tok/s 205456 | grad_norm 0.477
+step 940/13390 | loss 4.0130 | lr_mult 0.9400 | tok/s 205470 | grad_norm 0.440
+step 950/13390 | loss 4.0313 | lr_mult 0.9500 | tok/s 205484 | grad_norm 0.715
+step 960/13390 | loss 4.0662 | lr_mult 0.9600 | tok/s 205498 | grad_norm 0.720
+step 970/13390 | loss 4.1411 | lr_mult 0.9700 | tok/s 205511 | grad_norm 0.647
+step 980/13390 | loss 4.0859 | lr_mult 0.9800 | tok/s 205524 | grad_norm 0.420
+step 990/13390 | loss 4.0049 | lr_mult 0.9900 | tok/s 205538 | grad_norm 0.322
+step 1000/13390 | loss 3.9550 | lr_mult 1.0000 | tok/s 205550 | grad_norm 0.378
+step 1000/13390 | val_loss 3.9401
+step 1010/13390 | loss 3.9607 | lr_mult 1.0000 | tok/s 204939 | grad_norm 0.425
+step 1020/13390 | loss 3.9397 | lr_mult 1.0000 | tok/s 204957 | grad_norm 0.885
+step 1030/13390 | loss 4.0474 | lr_mult 1.0000 | tok/s 204975 | grad_norm 0.504
+step 1040/13390 | loss 3.9736 | lr_mult 1.0000 | tok/s 204993 | grad_norm 0.365
+step 1050/13390 | loss 3.9385 | lr_mult 1.0000 | tok/s 205010 | grad_norm 0.358
+step 1060/13390 | loss 3.8975 | lr_mult 0.9999 | tok/s 205027 | grad_norm 0.389
+step 1070/13390 | loss 3.8968 | lr_mult 0.9999 | tok/s 205044 | grad_norm 0.336
+step 1080/13390 | loss 3.8836 | lr_mult 0.9999 | tok/s 205061 | grad_norm 0.307
+step 1090/13390 | loss 3.8798 | lr_mult 0.9999 | tok/s 205077 | grad_norm 0.409
+step 1100/13390 | loss 3.8888 | lr_mult 0.9998 | tok/s 205092 | grad_norm 0.284
+step 1110/13390 | loss 3.8985 | lr_mult 0.9998 | tok/s 205107 | grad_norm 0.484
+step 1120/13390 | loss 3.8658 | lr_mult 0.9998 | tok/s 205123 | grad_norm 0.328
+step 1130/13390 | loss 3.8426 | lr_mult 0.9997 | tok/s 205139 | grad_norm 0.310
+step 1140/13390 | loss 3.8530 | lr_mult 0.9997 | tok/s 205154 | grad_norm 0.222
+step 1150/13390 | loss 3.8291 | lr_mult 0.9996 | tok/s 205169 | grad_norm 0.445
+step 1160/13390 | loss 3.8047 | lr_mult 0.9996 | tok/s 205184 | grad_norm 0.292
+step 1170/13390 | loss 3.8002 | lr_mult 0.9995 | tok/s 205198 | grad_norm 0.333
+step 1180/13390 | loss 3.7736 | lr_mult 0.9995 | tok/s 205211 | grad_norm 0.277
+step 1190/13390 | loss 3.7778 | lr_mult 0.9994 | tok/s 205225 | grad_norm 0.243
+step 1200/13390 | loss 3.8114 | lr_mult 0.9994 | tok/s 205238 | grad_norm 0.228
+step 1210/13390 | loss 3.8266 | lr_mult 0.9993 | tok/s 205251 | grad_norm 0.767
+step 1220/13390 | loss 4.1316 | lr_mult 0.9992 | tok/s 205263 | grad_norm 1.428
+step 1230/13390 | loss 3.9974 | lr_mult 0.9991 | tok/s 205276 | grad_norm 0.329
+step 1240/13390 | loss 3.8433 | lr_mult 0.9991 | tok/s 205289 | grad_norm 0.350
+step 1250/13390 | loss 3.8097 | lr_mult 0.9990 | tok/s 205301 | grad_norm 0.275
+step 1260/13390 | loss 3.7427 | lr_mult 0.9989 | tok/s 205313 | grad_norm 0.235
+step 1270/13390 | loss 3.7422 | lr_mult 0.9988 | tok/s 205325 | grad_norm 0.215
+step 1280/13390 | loss 3.7534 | lr_mult 0.9987 | tok/s 205337 | grad_norm 0.377
+step 1290/13390 | loss 3.7483 | lr_mult 0.9986 | tok/s 205348 | grad_norm 0.274
+step 1300/13390 | loss 3.6969 | lr_mult 0.9986 | tok/s 205360 | grad_norm 0.247
+step 1310/13390 | loss 3.7372 | lr_mult 0.9985 | tok/s 205372 | grad_norm 0.299
+step 1320/13390 | loss 3.7460 | lr_mult 0.9984 | tok/s 205383 | grad_norm 0.333
+step 1330/13390 | loss 3.6850 | lr_mult 0.9983 | tok/s 205394 | grad_norm 0.308
+step 1340/13390 | loss 3.7033 | lr_mult 0.9981 | tok/s 205405 | grad_norm 0.217
+step 1350/13390 | loss 3.6857 | lr_mult 0.9980 | tok/s 205415 | grad_norm 0.371
+step 1360/13390 | loss 3.6746 | lr_mult 0.9979 | tok/s 205426 | grad_norm 0.248
+step 1370/13390 | loss 3.6634 | lr_mult 0.9978 | tok/s 205436 | grad_norm 0.260
+step 1380/13390 | loss 3.6760 | lr_mult 0.9977 | tok/s 205446 | grad_norm 0.264
+step 1390/13390 | loss 3.6802 | lr_mult 0.9976 | tok/s 205456 | grad_norm 0.218
+step 1400/13390 | loss 3.6297 | lr_mult 0.9974 | tok/s 205467 | grad_norm 0.243
+step 1410/13390 | loss 3.6755 | lr_mult 0.9973 | tok/s 205477 | grad_norm 0.245
+step 1420/13390 | loss 3.6375 | lr_mult 0.9972 | tok/s 205487 | grad_norm 0.189
+step 1430/13390 | loss 3.6445 | lr_mult 0.9970 | tok/s 205497 | grad_norm 0.233
+step 1440/13390 | loss 3.6365 | lr_mult 0.9969 | tok/s 205507 | grad_norm 0.236
+step 1450/13390 | loss 3.6361 | lr_mult 0.9967 | tok/s 205516 | grad_norm 0.213
+step 1460/13390 | loss 3.6673 | lr_mult 0.9966 | tok/s 205525 | grad_norm 0.220
+step 1470/13390 | loss 3.6761 | lr_mult 0.9965 | tok/s 205534 | grad_norm 0.252
+step 1480/13390 | loss 3.6327 | lr_mult 0.9963 | tok/s 205543 | grad_norm 0.637
+step 1490/13390 | loss 3.6834 | lr_mult 0.9961 | tok/s 205552 | grad_norm 1.792
+step 1500/13390 | loss 3.8718 | lr_mult 0.9960 | tok/s 205561 | grad_norm 0.640
+step 1500/13390 | val_loss 3.7689
+step 1510/13390 | loss 3.7113 | lr_mult 0.9958 | tok/s 205152 | grad_norm 0.202
+step 1520/13390 | loss 3.6432 | lr_mult 0.9957 | tok/s 205163 | grad_norm 0.204
+step 1530/13390 | loss 3.6426 | lr_mult 0.9955 | tok/s 205174 | grad_norm 0.316
+step 1540/13390 | loss 3.6044 | lr_mult 0.9953 | tok/s 205185 | grad_norm 0.230
+step 1550/13390 | loss 3.6392 | lr_mult 0.9951 | tok/s 205196 | grad_norm 0.276
+step 1560/13390 | loss 3.5889 | lr_mult 0.9950 | tok/s 205207 | grad_norm 0.202
+step 1570/13390 | loss 3.6108 | lr_mult 0.9948 | tok/s 205218 | grad_norm 0.208
+step 1580/13390 | loss 3.5744 | lr_mult 0.9946 | tok/s 205229 | grad_norm 0.289
+step 1590/13390 | loss 3.5798 | lr_mult 0.9944 | tok/s 205239 | grad_norm 0.267
+step 1600/13390 | loss 3.5710 | lr_mult 0.9942 | tok/s 205249 | grad_norm 0.254
+step 1610/13390 | loss 3.5801 | lr_mult 0.9940 | tok/s 205259 | grad_norm 0.199
+step 1620/13390 | loss 3.5598 | lr_mult 0.9938 | tok/s 205268 | grad_norm 0.184
+step 1630/13390 | loss 3.5778 | lr_mult 0.9936 | tok/s 205278 | grad_norm 0.246
+step 1640/13390 | loss 3.5396 | lr_mult 0.9934 | tok/s 205287 | grad_norm 0.197
+step 1650/13390 | loss 3.5824 | lr_mult 0.9932 | tok/s 205297 | grad_norm 0.257
+step 1660/13390 | loss 3.5590 | lr_mult 0.9930 | tok/s 205306 | grad_norm 0.185
+step 1670/13390 | loss 3.5489 | lr_mult 0.9928 | tok/s 205315 | grad_norm 0.241
+step 1680/13390 | loss 3.5662 | lr_mult 0.9926 | tok/s 205325 | grad_norm 0.224
+step 1690/13390 | loss 3.5623 | lr_mult 0.9924 | tok/s 205333 | grad_norm 0.215
+step 1700/13390 | loss 3.5278 | lr_mult 0.9921 | tok/s 205342 | grad_norm 0.221
+step 1710/13390 | loss 3.5467 | lr_mult 0.9919 | tok/s 205351 | grad_norm 0.216
+step 1720/13390 | loss 3.5415 | lr_mult 0.9917 | tok/s 205360 | grad_norm 0.242
+step 1730/13390 | loss 3.5490 | lr_mult 0.9915 | tok/s 205369 | grad_norm 0.213
+step 1740/13390 | loss 3.5279 | lr_mult 0.9912 | tok/s 205377 | grad_norm 0.210
+step 1750/13390 | loss 3.5126 | lr_mult 0.9910 | tok/s 205385 | grad_norm 0.266
+step 1760/13390 | loss 3.5245 | lr_mult 0.9907 | tok/s 205394 | grad_norm 0.235
+step 1770/13390 | loss 3.5135 | lr_mult 0.9905 | tok/s 205402 | grad_norm 0.239
+step 1780/13390 | loss 3.5179 | lr_mult 0.9903 | tok/s 205410 | grad_norm 0.271
+step 1790/13390 | loss 3.5419 | lr_mult 0.9900 | tok/s 205418 | grad_norm 0.264
+step 1800/13390 | loss 3.5393 | lr_mult 0.9897 | tok/s 205426 | grad_norm 0.234
+step 1810/13390 | loss 3.5116 | lr_mult 0.9895 | tok/s 205433 | grad_norm 0.207
+step 1820/13390 | loss 3.4940 | lr_mult 0.9892 | tok/s 205441 | grad_norm 0.169
+step 1830/13390 | loss 3.4995 | lr_mult 0.9890 | tok/s 205449 | grad_norm 0.220
+step 1840/13390 | loss 3.4890 | lr_mult 0.9887 | tok/s 205456 | grad_norm 0.230
+step 1850/13390 | loss 3.4905 | lr_mult 0.9884 | tok/s 205463 | grad_norm 0.215
+step 1860/13390 | loss 3.4644 | lr_mult 0.9882 | tok/s 205471 | grad_norm 0.241
+step 1870/13390 | loss 3.4843 | lr_mult 0.9879 | tok/s 205478 | grad_norm 0.270
+step 1880/13390 | loss 3.4699 | lr_mult 0.9876 | tok/s 205485 | grad_norm 0.196
+step 1890/13390 | loss 3.4879 | lr_mult 0.9873 | tok/s 205492 | grad_norm 0.188
+step 1900/13390 | loss 3.4799 | lr_mult 0.9870 | tok/s 205500 | grad_norm 0.256
+step 1910/13390 | loss 3.4586 | lr_mult 0.9867 | tok/s 205507 | grad_norm 0.183
+step 1920/13390 | loss 3.4769 | lr_mult 0.9865 | tok/s 205513 | grad_norm 0.185
+step 1930/13390 | loss 3.4510 | lr_mult 0.9862 | tok/s 205520 | grad_norm 0.209
+step 1940/13390 | loss 3.4739 | lr_mult 0.9859 | tok/s 205527 | grad_norm 0.266
+step 1950/13390 | loss 3.4814 | lr_mult 0.9856 | tok/s 205533 | grad_norm 0.180
+step 1960/13390 | loss 3.4573 | lr_mult 0.9853 | tok/s 205540 | grad_norm 0.223
+step 1970/13390 | loss 3.4553 | lr_mult 0.9850 | tok/s 205546 | grad_norm 0.176
+step 1980/13390 | loss 3.4513 | lr_mult 0.9846 | tok/s 205552 | grad_norm 0.268
+step 1990/13390 | loss 3.4612 | lr_mult 0.9843 | tok/s 205558 | grad_norm 0.180
+step 2000/13390 | loss 3.4389 | lr_mult 0.9840 | tok/s 205565 | grad_norm 0.197
+step 2000/13390 | val_loss 3.4290
+step 2010/13390 | loss 3.4575 | lr_mult 0.9837 | tok/s 205257 | grad_norm 0.182
+step 2020/13390 | loss 3.4762 | lr_mult 0.9834 | tok/s 205264 | grad_norm 0.196
+step 2030/13390 | loss 3.4371 | lr_mult 0.9830 | tok/s 205272 | grad_norm 0.217
+step 2040/13390 | loss 3.4129 | lr_mult 0.9827 | tok/s 205280 | grad_norm 0.233
+step 2050/13390 | loss 3.4665 | lr_mult 0.9824 | tok/s 205287 | grad_norm 0.192
+step 2060/13390 | loss 3.4295 | lr_mult 0.9820 | tok/s 205295 | grad_norm 0.227
+step 2070/13390 | loss 3.4223 | lr_mult 0.9817 | tok/s 205302 | grad_norm 0.231
+step 2080/13390 | loss 3.4077 | lr_mult 0.9814 | tok/s 205309 | grad_norm 0.228
+step 2090/13390 | loss 3.4482 | lr_mult 0.9810 | tok/s 205316 | grad_norm 0.221
+step 2100/13390 | loss 3.3997 | lr_mult 0.9807 | tok/s 205323 | grad_norm 0.181
+step 2110/13390 | loss 3.4172 | lr_mult 0.9803 | tok/s 205330 | grad_norm 0.257
+step 2120/13390 | loss 3.4178 | lr_mult 0.9800 | tok/s 205337 | grad_norm 0.187
+step 2130/13390 | loss 3.4509 | lr_mult 0.9796 | tok/s 205344 | grad_norm 0.240
+step 2140/13390 | loss 3.4078 | lr_mult 0.9793 | tok/s 205351 | grad_norm 0.213
+step 2150/13390 | loss 3.3923 | lr_mult 0.9789 | tok/s 205358 | grad_norm 0.215
+step 2160/13390 | loss 3.4047 | lr_mult 0.9785 | tok/s 205365 | grad_norm 0.167
+step 2170/13390 | loss 3.3815 | lr_mult 0.9782 | tok/s 205371 | grad_norm 0.255
+step 2180/13390 | loss 3.4096 | lr_mult 0.9778 | tok/s 205378 | grad_norm 0.224
+step 2190/13390 | loss 3.3850 | lr_mult 0.9774 | tok/s 205385 | grad_norm 0.210
+step 2200/13390 | loss 3.4130 | lr_mult 0.9770 | tok/s 205392 | grad_norm 0.175
+step 2210/13390 | loss 3.4198 | lr_mult 0.9767 | tok/s 205398 | grad_norm 0.245
+step 2220/13390 | loss 3.3511 | lr_mult 0.9763 | tok/s 205405 | grad_norm 0.246
+step 2230/13390 | loss 3.3839 | lr_mult 0.9759 | tok/s 205411 | grad_norm 0.186
+step 2240/13390 | loss 3.3883 | lr_mult 0.9755 | tok/s 205417 | grad_norm 0.155
+step 2250/13390 | loss 3.4002 | lr_mult 0.9751 | tok/s 205424 | grad_norm 0.242
+step 2260/13390 | loss 3.3957 | lr_mult 0.9747 | tok/s 205430 | grad_norm 0.173
+step 2270/13390 | loss 3.3884 | lr_mult 0.9743 | tok/s 205437 | grad_norm 0.217
+step 2280/13390 | loss 3.3564 | lr_mult 0.9739 | tok/s 205443 | grad_norm 0.174
+step 2290/13390 | loss 3.3636 | lr_mult 0.9735 | tok/s 205449 | grad_norm 0.216
+step 2300/13390 | loss 3.3873 | lr_mult 0.9731 | tok/s 205456 | grad_norm 0.401
+step 2310/13390 | loss 3.3750 | lr_mult 0.9727 | tok/s 205462 | grad_norm 0.217
+step 2320/13390 | loss 3.3829 | lr_mult 0.9723 | tok/s 205468 | grad_norm 0.153
+step 2330/13390 | loss 3.4013 | lr_mult 0.9718 | tok/s 205474 | grad_norm 0.188
+step 2340/13390 | loss 3.3779 | lr_mult 0.9714 | tok/s 205480 | grad_norm 0.239
+step 2350/13390 | loss 3.3660 | lr_mult 0.9710 | tok/s 205485 | grad_norm 0.177
+step 2360/13390 | loss 3.3841 | lr_mult 0.9706 | tok/s 205491 | grad_norm 0.300
+step 2370/13390 | loss 3.4081 | lr_mult 0.9701 | tok/s 205497 | grad_norm 0.233
+step 2380/13390 | loss 3.3628 | lr_mult 0.9697 | tok/s 205502 | grad_norm 0.217
+step 2390/13390 | loss 3.3787 | lr_mult 0.9693 | tok/s 205508 | grad_norm 0.195
+step 2400/13390 | loss 3.3586 | lr_mult 0.9688 | tok/s 205514 | grad_norm 0.156
+step 2410/13390 | loss 3.3436 | lr_mult 0.9684 | tok/s 205519 | grad_norm 0.210
+step 2420/13390 | loss 3.3556 | lr_mult 0.9679 | tok/s 205525 | grad_norm 0.266
+step 2430/13390 | loss 3.3365 | lr_mult 0.9675 | tok/s 205531 | grad_norm 0.171
+step 2440/13390 | loss 3.3604 | lr_mult 0.9670 | tok/s 205536 | grad_norm 0.188
+step 2450/13390 | loss 3.3399 | lr_mult 0.9666 | tok/s 205542 | grad_norm 0.197
+step 2460/13390 | loss 3.3566 | lr_mult 0.9661 | tok/s 205547 | grad_norm 0.199
+step 2470/13390 | loss 3.3632 | lr_mult 0.9657 | tok/s 205552 | grad_norm 0.177
+step 2480/13390 | loss 3.3312 | lr_mult 0.9652 | tok/s 205557 | grad_norm 0.258
+step 2490/13390 | loss 3.3576 | lr_mult 0.9647 | tok/s 205563 | grad_norm 0.189
+step 2500/13390 | loss 3.3294 | lr_mult 0.9643 | tok/s 205567 | grad_norm 0.178
+step 2500/13390 | val_loss 3.3252
+step 2510/13390 | loss 3.3366 | lr_mult 0.9638 | tok/s 205321 | grad_norm 0.176
+step 2520/13390 | loss 3.3037 | lr_mult 0.9633 | tok/s 205327 | grad_norm 0.192
+step 2530/13390 | loss 3.3453 | lr_mult 0.9628 | tok/s 205333 | grad_norm 0.210
+step 2540/13390 | loss 3.3303 | lr_mult 0.9624 | tok/s 205339 | grad_norm 0.164
+step 2550/13390 | loss 3.3502 | lr_mult 0.9619 | tok/s 205345 | grad_norm 0.238
+step 2560/13390 | loss 3.3305 | lr_mult 0.9614 | tok/s 205351 | grad_norm 0.175
+step 2570/13390 | loss 3.3359 | lr_mult 0.9609 | tok/s 205356 | grad_norm 0.164
+step 2580/13390 | loss 3.3976 | lr_mult 0.9604 | tok/s 205362 | grad_norm 0.165
+step 2590/13390 | loss 3.3253 | lr_mult 0.9599 | tok/s 205368 | grad_norm 0.218
+step 2600/13390 | loss 3.3391 | lr_mult 0.9594 | tok/s 205373 | grad_norm 0.217
+step 2610/13390 | loss 3.3265 | lr_mult 0.9589 | tok/s 205379 | grad_norm 0.154
+step 2620/13390 | loss 3.3296 | lr_mult 0.9584 | tok/s 205384 | grad_norm 0.173
+step 2630/13390 | loss 3.3284 | lr_mult 0.9579 | tok/s 205390 | grad_norm 0.238
+step 2640/13390 | loss 3.3200 | lr_mult 0.9574 | tok/s 205395 | grad_norm 0.154
+step 2650/13390 | loss 3.3337 | lr_mult 0.9569 | tok/s 205400 | grad_norm 0.237
+step 2660/13390 | loss 3.3009 | lr_mult 0.9564 | tok/s 205406 | grad_norm 0.180
+step 2670/13390 | loss 3.3411 | lr_mult 0.9558 | tok/s 205411 | grad_norm 0.192
+step 2680/13390 | loss 3.3102 | lr_mult 0.9553 | tok/s 205416 | grad_norm 0.185
+step 2690/13390 | loss 3.3107 | lr_mult 0.9548 | tok/s 205422 | grad_norm 0.212
+step 2700/13390 | loss 3.2895 | lr_mult 0.9543 | tok/s 205427 | grad_norm 0.177
+step 2710/13390 | loss 3.2873 | lr_mult 0.9537 | tok/s 205432 | grad_norm 0.203
+step 2720/13390 | loss 3.3336 | lr_mult 0.9532 | tok/s 205437 | grad_norm 0.206
+step 2730/13390 | loss 3.3004 | lr_mult 0.9527 | tok/s 205442 | grad_norm 0.199
+step 2740/13390 | loss 3.3129 | lr_mult 0.9521 | tok/s 205447 | grad_norm 0.161
+step 2750/13390 | loss 3.2779 | lr_mult 0.9516 | tok/s 205452 | grad_norm 0.173
+step 2760/13390 | loss 3.3202 | lr_mult 0.9510 | tok/s 205457 | grad_norm 0.184
+step 2770/13390 | loss 3.2979 | lr_mult 0.9505 | tok/s 205462 | grad_norm 0.167
+step 2780/13390 | loss 3.3156 | lr_mult 0.9499 | tok/s 205467 | grad_norm 0.199
+step 2790/13390 | loss 3.3063 | lr_mult 0.9494 | tok/s 205472 | grad_norm 0.196
+step 2800/13390 | loss 3.2837 | lr_mult 0.9488 | tok/s 205477 | grad_norm 0.161
+step 2810/13390 | loss 3.2926 | lr_mult 0.9483 | tok/s 205481 | grad_norm 0.262
+step 2820/13390 | loss 3.3121 | lr_mult 0.9477 | tok/s 205486 | grad_norm 0.160
+step 2830/13390 | loss 3.2848 | lr_mult 0.9471 | tok/s 205491 | grad_norm 0.216
+step 2840/13390 | loss 3.3110 | lr_mult 0.9466 | tok/s 205496 | grad_norm 0.192
+step 2850/13390 | loss 3.2554 | lr_mult 0.9460 | tok/s 205501 | grad_norm 0.144
+step 2860/13390 | loss 3.2830 | lr_mult 0.9454 | tok/s 205505 | grad_norm 0.155
+step 2870/13390 | loss 3.3029 | lr_mult 0.9448 | tok/s 205510 | grad_norm 0.233
+step 2880/13390 | loss 3.2873 | lr_mult 0.9443 | tok/s 205515 | grad_norm 0.168
+step 2890/13390 | loss 3.2936 | lr_mult 0.9437 | tok/s 205519 | grad_norm 0.160
+step 2900/13390 | loss 3.2918 | lr_mult 0.9431 | tok/s 205524 | grad_norm 0.174
+step 2910/13390 | loss 3.2541 | lr_mult 0.9425 | tok/s 205529 | grad_norm 0.163
+step 2920/13390 | loss 3.2758 | lr_mult 0.9419 | tok/s 205533 | grad_norm 0.176
+step 2930/13390 | loss 3.2526 | lr_mult 0.9413 | tok/s 205538 | grad_norm 0.183
+step 2940/13390 | loss 3.2905 | lr_mult 0.9407 | tok/s 205542 | grad_norm 0.168
+step 2950/13390 | loss 3.2599 | lr_mult 0.9401 | tok/s 205547 | grad_norm 0.154
+step 2960/13390 | loss 3.2961 | lr_mult 0.9395 | tok/s 205551 | grad_norm 0.164
+step 2970/13390 | loss 3.3107 | lr_mult 0.9389 | tok/s 205556 | grad_norm 0.192
+step 2980/13390 | loss 3.2933 | lr_mult 0.9383 | tok/s 205560 | grad_norm 0.190
+step 2990/13390 | loss 3.2890 | lr_mult 0.9377 | tok/s 205564 | grad_norm 0.169
+step 3000/13390 | loss 3.2770 | lr_mult 0.9371 | tok/s 205568 | grad_norm 0.198
+step 3000/13390 | val_loss 3.2565
+step 3010/13390 | loss 3.2811 | lr_mult 0.9365 | tok/s 205363 | grad_norm 0.187
+step 3020/13390 | loss 3.2716 | lr_mult 0.9358 | tok/s 205368 | grad_norm 0.184
+step 3030/13390 | loss 3.2506 | lr_mult 0.9352 | tok/s 205373 | grad_norm 0.182
+step 3040/13390 | loss 3.2870 | lr_mult 0.9346 | tok/s 205378 | grad_norm 0.233
+step 3050/13390 | loss 3.2468 | lr_mult 0.9340 | tok/s 205382 | grad_norm 0.163
+step 3060/13390 | loss 3.2450 | lr_mult 0.9333 | tok/s 205387 | grad_norm 0.178
+step 3070/13390 | loss 3.2311 | lr_mult 0.9327 | tok/s 205392 | grad_norm 0.204
+step 3080/13390 | loss 3.2855 | lr_mult 0.9321 | tok/s 205396 | grad_norm 0.166
+step 3090/13390 | loss 3.2506 | lr_mult 0.9314 | tok/s 205401 | grad_norm 0.201
+step 3100/13390 | loss 3.2541 | lr_mult 0.9308 | tok/s 205406 | grad_norm 0.179
+step 3110/13390 | loss 3.2772 | lr_mult 0.9301 | tok/s 205410 | grad_norm 0.161
+step 3120/13390 | loss 3.2851 | lr_mult 0.9295 | tok/s 205415 | grad_norm 0.160
+step 3130/13390 | loss 3.2579 | lr_mult 0.9288 | tok/s 205419 | grad_norm 0.161
+step 3140/13390 | loss 3.2516 | lr_mult 0.9282 | tok/s 205424 | grad_norm 0.194
+step 3150/13390 | loss 3.2656 | lr_mult 0.9275 | tok/s 205428 | grad_norm 0.168
+step 3160/13390 | loss 3.2631 | lr_mult 0.9269 | tok/s 205433 | grad_norm 0.221
+step 3170/13390 | loss 3.2596 | lr_mult 0.9262 | tok/s 205437 | grad_norm 0.161
+step 3180/13390 | loss 3.2458 | lr_mult 0.9255 | tok/s 205442 | grad_norm 0.192
+step 3190/13390 | loss 3.2581 | lr_mult 0.9249 | tok/s 205446 | grad_norm 0.151
+step 3200/13390 | loss 3.2503 | lr_mult 0.9242 | tok/s 205451 | grad_norm 0.167
+step 3210/13390 | loss 3.2168 | lr_mult 0.9235 | tok/s 205455 | grad_norm 0.196
+step 3220/13390 | loss 3.2636 | lr_mult 0.9229 | tok/s 205459 | grad_norm 0.161
+step 3230/13390 | loss 3.2020 | lr_mult 0.9222 | tok/s 205464 | grad_norm 0.201
+step 3240/13390 | loss 3.2193 | lr_mult 0.9215 | tok/s 205468 | grad_norm 0.197
+step 3250/13390 | loss 3.2522 | lr_mult 0.9208 | tok/s 205472 | grad_norm 0.182
+step 3260/13390 | loss 3.2693 | lr_mult 0.9201 | tok/s 205476 | grad_norm 0.204
+step 3270/13390 | loss 3.2396 | lr_mult 0.9194 | tok/s 205480 | grad_norm 0.163
+step 3280/13390 | loss 3.2382 | lr_mult 0.9187 | tok/s 205485 | grad_norm 0.183
+step 3290/13390 | loss 3.2557 | lr_mult 0.9181 | tok/s 205489 | grad_norm 0.148
+step 3300/13390 | loss 3.2642 | lr_mult 0.9174 | tok/s 205493 | grad_norm 0.167
+step 3310/13390 | loss 3.1853 | lr_mult 0.9167 | tok/s 205497 | grad_norm 0.162
+step 3320/13390 | loss 3.2660 | lr_mult 0.9160 | tok/s 205501 | grad_norm 0.163
+step 3330/13390 | loss 3.2320 | lr_mult 0.9152 | tok/s 205505 | grad_norm 0.170
+step 3340/13390 | loss 3.2040 | lr_mult 0.9145 | tok/s 205509 | grad_norm 0.213
+step 3350/13390 | loss 3.2689 | lr_mult 0.9138 | tok/s 205513 | grad_norm 0.141
+step 3360/13390 | loss 3.2056 | lr_mult 0.9131 | tok/s 205517 | grad_norm 0.185
+step 3370/13390 | loss 3.2283 | lr_mult 0.9124 | tok/s 205521 | grad_norm 0.171
+step 3380/13390 | loss 3.2001 | lr_mult 0.9117 | tok/s 205524 | grad_norm 0.210
+step 3390/13390 | loss 3.2330 | lr_mult 0.9110 | tok/s 205528 | grad_norm 0.168
+step 3400/13390 | loss 3.2365 | lr_mult 0.9102 | tok/s 205532 | grad_norm 0.154
+step 3410/13390 | loss 3.2345 | lr_mult 0.9095 | tok/s 205536 | grad_norm 0.163
+step 3420/13390 | loss 3.2658 | lr_mult 0.9088 | tok/s 205540 | grad_norm 0.168
+step 3430/13390 | loss 3.2343 | lr_mult 0.9081 | tok/s 205544 | grad_norm 0.263
+step 3440/13390 | loss 3.2308 | lr_mult 0.9073 | tok/s 205547 | grad_norm 0.150
+step 3450/13390 | loss 3.2300 | lr_mult 0.9066 | tok/s 205551 | grad_norm 0.173
+step 3460/13390 | loss 3.2292 | lr_mult 0.9058 | tok/s 205555 | grad_norm 0.166
+step 3470/13390 | loss 3.2325 | lr_mult 0.9051 | tok/s 205558 | grad_norm 0.173
+step 3480/13390 | loss 3.2279 | lr_mult 0.9044 | tok/s 205562 | grad_norm 0.191
+step 3490/13390 | loss 3.2240 | lr_mult 0.9036 | tok/s 205566 | grad_norm 0.163
+step 3500/13390 | loss 3.1956 | lr_mult 0.9029 | tok/s 205569 | grad_norm 0.148
+step 3500/13390 | val_loss 3.2019
+step 3510/13390 | loss 3.2221 | lr_mult 0.9021 | tok/s 205393 | grad_norm 0.157
+step 3520/13390 | loss 3.2117 | lr_mult 0.9014 | tok/s 205397 | grad_norm 0.179
+step 3530/13390 | loss 3.1872 | lr_mult 0.9006 | tok/s 205401 | grad_norm 0.185
+step 3540/13390 | loss 3.2086 | lr_mult 0.8998 | tok/s 205405 | grad_norm 0.147
+step 3550/13390 | loss 3.2489 | lr_mult 0.8991 | tok/s 205409 | grad_norm 0.171
+step 3560/13390 | loss 3.2436 | lr_mult 0.8983 | tok/s 205413 | grad_norm 0.164
+step 3570/13390 | loss 3.1995 | lr_mult 0.8975 | tok/s 205417 | grad_norm 0.165
+step 3580/13390 | loss 3.1996 | lr_mult 0.8968 | tok/s 205421 | grad_norm 0.152
+step 3590/13390 | loss 3.2198 | lr_mult 0.8960 | tok/s 205425 | grad_norm 0.158
+step 3600/13390 | loss 3.2112 | lr_mult 0.8952 | tok/s 205429 | grad_norm 0.174
+step 3610/13390 | loss 3.2261 | lr_mult 0.8944 | tok/s 205433 | grad_norm 0.171
+step 3620/13390 | loss 3.1839 | lr_mult 0.8937 | tok/s 205437 | grad_norm 0.173
+step 3630/13390 | loss 3.2020 | lr_mult 0.8929 | tok/s 205440 | grad_norm 0.190
+step 3640/13390 | loss 3.2095 | lr_mult 0.8921 | tok/s 205444 | grad_norm 0.171
+step 3650/13390 | loss 3.1744 | lr_mult 0.8913 | tok/s 205448 | grad_norm 0.176
+step 3660/13390 | loss 3.1860 | lr_mult 0.8905 | tok/s 205452 | grad_norm 0.195
+step 3670/13390 | loss 3.2100 | lr_mult 0.8897 | tok/s 205456 | grad_norm 0.192
+step 3680/13390 | loss 3.2012 | lr_mult 0.8889 | tok/s 205459 | grad_norm 0.199
+step 3690/13390 | loss 3.1966 | lr_mult 0.8881 | tok/s 205463 | grad_norm 0.199
+step 3700/13390 | loss 3.1954 | lr_mult 0.8873 | tok/s 205467 | grad_norm 0.180
+step 3710/13390 | loss 3.1928 | lr_mult 0.8865 | tok/s 205471 | grad_norm 0.171
+step 3720/13390 | loss 3.2214 | lr_mult 0.8857 | tok/s 205474 | grad_norm 0.181
+step 3730/13390 | loss 3.1549 | lr_mult 0.8849 | tok/s 205478 | grad_norm 0.208
+step 3740/13390 | loss 3.1884 | lr_mult 0.8841 | tok/s 205482 | grad_norm 0.152
+step 3750/13390 | loss 3.2049 | lr_mult 0.8833 | tok/s 205485 | grad_norm 0.148
+step 3760/13390 | loss 3.2206 | lr_mult 0.8825 | tok/s 205489 | grad_norm 0.150
+step 3770/13390 | loss 3.1910 | lr_mult 0.8817 | tok/s 205492 | grad_norm 0.143
+step 3780/13390 | loss 3.2052 | lr_mult 0.8808 | tok/s 205496 | grad_norm 0.160
+step 3790/13390 | loss 3.2034 | lr_mult 0.8800 | tok/s 205499 | grad_norm 0.158
+step 3800/13390 | loss 3.1944 | lr_mult 0.8792 | tok/s 205503 | grad_norm 0.160
+step 3810/13390 | loss 3.2074 | lr_mult 0.8784 | tok/s 205506 | grad_norm 0.161
+step 3820/13390 | loss 3.1869 | lr_mult 0.8775 | tok/s 205510 | grad_norm 0.137
+step 3830/13390 | loss 3.1713 | lr_mult 0.8767 | tok/s 205513 | grad_norm 0.171
+step 3840/13390 | loss 3.1902 | lr_mult 0.8759 | tok/s 205517 | grad_norm 0.172
+step 3850/13390 | loss 3.1836 | lr_mult 0.8750 | tok/s 205520 | grad_norm 0.649
+step 3860/13390 | loss 3.2027 | lr_mult 0.8742 | tok/s 205524 | grad_norm 0.351
+step 3870/13390 | loss 3.1928 | lr_mult 0.8733 | tok/s 205527 | grad_norm 0.138
+step 3880/13390 | loss 3.2028 | lr_mult 0.8725 | tok/s 205531 | grad_norm 0.143
+step 3890/13390 | loss 3.2082 | lr_mult 0.8717 | tok/s 205534 | grad_norm 0.139
+step 3900/13390 | loss 3.1882 | lr_mult 0.8708 | tok/s 205537 | grad_norm 0.144
+step 3910/13390 | loss 3.1734 | lr_mult 0.8700 | tok/s 205541 | grad_norm 0.155
+step 3920/13390 | loss 3.1740 | lr_mult 0.8691 | tok/s 205544 | grad_norm 0.160
+step 3930/13390 | loss 3.1908 | lr_mult 0.8682 | tok/s 205547 | grad_norm 0.164
+step 3940/13390 | loss 3.2211 | lr_mult 0.8674 | tok/s 205551 | grad_norm 0.185
+step 3950/13390 | loss 3.1502 | lr_mult 0.8665 | tok/s 205554 | grad_norm 0.168
+step 3960/13390 | loss 3.1821 | lr_mult 0.8657 | tok/s 205557 | grad_norm 0.181
+step 3970/13390 | loss 3.1663 | lr_mult 0.8648 | tok/s 205560 | grad_norm 0.141
+step 3980/13390 | loss 3.1370 | lr_mult 0.8639 | tok/s 205563 | grad_norm 0.200
+step 3990/13390 | loss 3.1939 | lr_mult 0.8631 | tok/s 205567 | grad_norm 0.157
+step 4000/13390 | loss 3.1821 | lr_mult 0.8622 | tok/s 205570 | grad_norm 0.171
+step 4000/13390 | val_loss 3.1612
+step 4010/13390 | loss 3.2087 | lr_mult 0.8613 | tok/s 205415 | grad_norm 0.152
+step 4020/13390 | loss 3.1515 | lr_mult 0.8604 | tok/s 205419 | grad_norm 0.155
+step 4030/13390 | loss 3.1892 | lr_mult 0.8596 | tok/s 205423 | grad_norm 0.201
+step 4040/13390 | loss 3.1661 | lr_mult 0.8587 | tok/s 205426 | grad_norm 0.144
+step 4050/13390 | loss 3.1833 | lr_mult 0.8578 | tok/s 205429 | grad_norm 0.211
+step 4060/13390 | loss 3.1835 | lr_mult 0.8569 | tok/s 205433 | grad_norm 0.183
+step 4070/13390 | loss 3.1648 | lr_mult 0.8560 | tok/s 205436 | grad_norm 0.157
+step 4080/13390 | loss 3.1655 | lr_mult 0.8551 | tok/s 205439 | grad_norm 0.187
+step 4090/13390 | loss 3.2117 | lr_mult 0.8542 | tok/s 205443 | grad_norm 0.145
+step 4100/13390 | loss 3.1538 | lr_mult 0.8533 | tok/s 205447 | grad_norm 0.171
+step 4110/13390 | loss 3.1705 | lr_mult 0.8524 | tok/s 205450 | grad_norm 0.160
+step 4120/13390 | loss 3.1604 | lr_mult 0.8515 | tok/s 205453 | grad_norm 0.196
+step 4130/13390 | loss 3.1540 | lr_mult 0.8506 | tok/s 205457 | grad_norm 0.157
+step 4140/13390 | loss 3.1715 | lr_mult 0.8497 | tok/s 205460 | grad_norm 0.195
+step 4150/13390 | loss 3.1778 | lr_mult 0.8488 | tok/s 205463 | grad_norm 0.156
+step 4160/13390 | loss 3.1429 | lr_mult 0.8479 | tok/s 205466 | grad_norm 0.176
+step 4170/13390 | loss 3.1499 | lr_mult 0.8470 | tok/s 205470 | grad_norm 0.143
+step 4180/13390 | loss 3.1722 | lr_mult 0.8461 | tok/s 205473 | grad_norm 0.161
+step 4190/13390 | loss 3.1345 | lr_mult 0.8452 | tok/s 205476 | grad_norm 0.145
+step 4200/13390 | loss 3.1892 | lr_mult 0.8442 | tok/s 205479 | grad_norm 0.164
+step 4210/13390 | loss 3.1744 | lr_mult 0.8433 | tok/s 205482 | grad_norm 0.158
+step 4220/13390 | loss 3.1658 | lr_mult 0.8424 | tok/s 205486 | grad_norm 0.188
+step 4230/13390 | loss 3.1770 | lr_mult 0.8415 | tok/s 205489 | grad_norm 0.288
+step 4240/13390 | loss 3.1880 | lr_mult 0.8406 | tok/s 205492 | grad_norm 0.173
+step 4250/13390 | loss 3.1406 | lr_mult 0.8396 | tok/s 205495 | grad_norm 0.135
+step 4260/13390 | loss 3.1716 | lr_mult 0.8387 | tok/s 205498 | grad_norm 0.147
+step 4270/13390 | loss 3.1783 | lr_mult 0.8378 | tok/s 205501 | grad_norm 0.152
+step 4280/13390 | loss 3.1360 | lr_mult 0.8368 | tok/s 205504 | grad_norm 0.148
+step 4290/13390 | loss 3.1632 | lr_mult 0.8359 | tok/s 205507 | grad_norm 0.147
+step 4300/13390 | loss 3.1663 | lr_mult 0.8349 | tok/s 205510 | grad_norm 0.165
+step 4310/13390 | loss 3.1148 | lr_mult 0.8340 | tok/s 205513 | grad_norm 0.159
+step 4320/13390 | loss 3.1473 | lr_mult 0.8331 | tok/s 205516 | grad_norm 0.152
+step 4330/13390 | loss 3.1220 | lr_mult 0.8321 | tok/s 205519 | grad_norm 0.151
+step 4340/13390 | loss 3.1590 | lr_mult 0.8312 | tok/s 205522 | grad_norm 0.168
+step 4350/13390 | loss 3.1661 | lr_mult 0.8302 | tok/s 205525 | grad_norm 0.148
+step 4360/13390 | loss 3.1596 | lr_mult 0.8293 | tok/s 205528 | grad_norm 0.126
+step 4370/13390 | loss 3.1372 | lr_mult 0.8283 | tok/s 205531 | grad_norm 0.167
+step 4380/13390 | loss 3.1670 | lr_mult 0.8273 | tok/s 205534 | grad_norm 0.184
+step 4390/13390 | loss 3.1389 | lr_mult 0.8264 | tok/s 205537 | grad_norm 0.141
+step 4400/13390 | loss 3.1230 | lr_mult 0.8254 | tok/s 205540 | grad_norm 0.153
+step 4410/13390 | loss 3.1393 | lr_mult 0.8245 | tok/s 205543 | grad_norm 0.144
+step 4420/13390 | loss 3.1635 | lr_mult 0.8235 | tok/s 205546 | grad_norm 0.181
+step 4430/13390 | loss 3.1128 | lr_mult 0.8225 | tok/s 205549 | grad_norm 0.148
+step 4440/13390 | loss 3.1649 | lr_mult 0.8216 | tok/s 205552 | grad_norm 0.147
+step 4450/13390 | loss 3.1580 | lr_mult 0.8206 | tok/s 205555 | grad_norm 0.173
+step 4460/13390 | loss 3.1457 | lr_mult 0.8196 | tok/s 205558 | grad_norm 0.157
+step 4470/13390 | loss 3.1271 | lr_mult 0.8186 | tok/s 205560 | grad_norm 0.142
+step 4480/13390 | loss 3.1553 | lr_mult 0.8177 | tok/s 205563 | grad_norm 0.155
+step 4490/13390 | loss 3.1347 | lr_mult 0.8167 | tok/s 205566 | grad_norm 0.141
+step 4500/13390 | loss 3.1327 | lr_mult 0.8157 | tok/s 205568 | grad_norm 0.144
+step 4500/13390 | val_loss 3.1254
+step 4510/13390 | loss 3.1177 | lr_mult 0.8147 | tok/s 205431 | grad_norm 0.149
+step 4520/13390 | loss 3.1409 | lr_mult 0.8137 | tok/s 205434 | grad_norm 0.134
+step 4530/13390 | loss 3.1567 | lr_mult 0.8127 | tok/s 205437 | grad_norm 0.166
+step 4540/13390 | loss 3.1405 | lr_mult 0.8117 | tok/s 205440 | grad_norm 0.141
+step 4550/13390 | loss 3.1033 | lr_mult 0.8108 | tok/s 205443 | grad_norm 0.172
+step 4560/13390 | loss 3.1166 | lr_mult 0.8098 | tok/s 205446 | grad_norm 0.156
+step 4570/13390 | loss 3.1188 | lr_mult 0.8088 | tok/s 205449 | grad_norm 0.140
+step 4580/13390 | loss 3.1399 | lr_mult 0.8078 | tok/s 205452 | grad_norm 0.134
+step 4590/13390 | loss 3.1158 | lr_mult 0.8068 | tok/s 205455 | grad_norm 0.201
+step 4600/13390 | loss 3.1486 | lr_mult 0.8058 | tok/s 205458 | grad_norm 0.144
+step 4610/13390 | loss 3.1352 | lr_mult 0.8048 | tok/s 205462 | grad_norm 0.169
+step 4620/13390 | loss 3.1343 | lr_mult 0.8038 | tok/s 205465 | grad_norm 0.146
+step 4630/13390 | loss 3.1238 | lr_mult 0.8027 | tok/s 205468 | grad_norm 0.131
+step 4640/13390 | loss 3.1262 | lr_mult 0.8017 | tok/s 205471 | grad_norm 0.162
+step 4650/13390 | loss 3.1416 | lr_mult 0.8007 | tok/s 205474 | grad_norm 0.126
+step 4660/13390 | loss 3.1019 | lr_mult 0.7997 | tok/s 205476 | grad_norm 0.147
+step 4670/13390 | loss 3.1349 | lr_mult 0.7987 | tok/s 205479 | grad_norm 0.131
+step 4680/13390 | loss 3.1325 | lr_mult 0.7977 | tok/s 205482 | grad_norm 0.153
+step 4690/13390 | loss 3.0923 | lr_mult 0.7967 | tok/s 205485 | grad_norm 0.185
+step 4700/13390 | loss 3.1130 | lr_mult 0.7956 | tok/s 205488 | grad_norm 0.140
+step 4710/13390 | loss 3.1100 | lr_mult 0.7946 | tok/s 205491 | grad_norm 0.162
+step 4720/13390 | loss 3.1451 | lr_mult 0.7936 | tok/s 205493 | grad_norm 0.139
+step 4730/13390 | loss 3.1207 | lr_mult 0.7926 | tok/s 205496 | grad_norm 0.155
+step 4740/13390 | loss 3.1205 | lr_mult 0.7915 | tok/s 205499 | grad_norm 0.140
+step 4750/13390 | loss 3.1185 | lr_mult 0.7905 | tok/s 205502 | grad_norm 0.140
+step 4760/13390 | loss 3.1237 | lr_mult 0.7895 | tok/s 205505 | grad_norm 0.137
+step 4770/13390 | loss 3.1209 | lr_mult 0.7884 | tok/s 205508 | grad_norm 0.133
+step 4780/13390 | loss 3.1194 | lr_mult 0.7874 | tok/s 205510 | grad_norm 0.152
+step 4790/13390 | loss 3.1261 | lr_mult 0.7864 | tok/s 205513 | grad_norm 0.144
+step 4800/13390 | loss 3.1257 | lr_mult 0.7853 | tok/s 205516 | grad_norm 0.139
+step 4810/13390 | loss 3.0920 | lr_mult 0.7843 | tok/s 205518 | grad_norm 0.141
+step 4820/13390 | loss 3.0955 | lr_mult 0.7832 | tok/s 205521 | grad_norm 0.122
+step 4830/13390 | loss 3.1138 | lr_mult 0.7822 | tok/s 205524 | grad_norm 0.135
+step 4840/13390 | loss 3.1274 | lr_mult 0.7811 | tok/s 205527 | grad_norm 0.152
+step 4850/13390 | loss 3.1405 | lr_mult 0.7801 | tok/s 205529 | grad_norm 0.130
+step 4860/13390 | loss 3.1510 | lr_mult 0.7790 | tok/s 205532 | grad_norm 0.186
+step 4870/13390 | loss 3.1052 | lr_mult 0.7780 | tok/s 205535 | grad_norm 0.123
+step 4880/13390 | loss 3.1086 | lr_mult 0.7769 | tok/s 205537 | grad_norm 0.138
+step 4890/13390 | loss 3.1334 | lr_mult 0.7759 | tok/s 205540 | grad_norm 0.154
+step 4900/13390 | loss 3.0965 | lr_mult 0.7748 | tok/s 205543 | grad_norm 0.134
+step 4910/13390 | loss 3.1059 | lr_mult 0.7738 | tok/s 205545 | grad_norm 0.175
+step 4920/13390 | loss 3.1059 | lr_mult 0.7727 | tok/s 205548 | grad_norm 0.138
+step 4930/13390 | loss 3.0918 | lr_mult 0.7716 | tok/s 205551 | grad_norm 0.150
+step 4940/13390 | loss 3.1054 | lr_mult 0.7706 | tok/s 205553 | grad_norm 0.171
+step 4950/13390 | loss 3.1218 | lr_mult 0.7695 | tok/s 205556 | grad_norm 0.136
+step 4960/13390 | loss 3.1126 | lr_mult 0.7684 | tok/s 205559 | grad_norm 0.144
+step 4970/13390 | loss 3.1019 | lr_mult 0.7674 | tok/s 205561 | grad_norm 0.129
+step 4980/13390 | loss 3.1123 | lr_mult 0.7663 | tok/s 205564 | grad_norm 0.126
+step 4990/13390 | loss 3.0971 | lr_mult 0.7652 | tok/s 205567 | grad_norm 0.163
+step 5000/13390 | loss 3.1180 | lr_mult 0.7641 | tok/s 205569 | grad_norm 0.138
+step 5000/13390 | val_loss 3.0959
+step 5010/13390 | loss 3.0794 | lr_mult 0.7631 | tok/s 205445 | grad_norm 0.133
+step 5020/13390 | loss 3.0885 | lr_mult 0.7620 | tok/s 205448 | grad_norm 0.167
+step 5030/13390 | loss 3.1170 | lr_mult 0.7609 | tok/s 205451 | grad_norm 0.149
+step 5040/13390 | loss 3.0847 | lr_mult 0.7598 | tok/s 205454 | grad_norm 0.157
+step 5050/13390 | loss 3.1196 | lr_mult 0.7587 | tok/s 205456 | grad_norm 0.155
+step 5060/13390 | loss 3.0861 | lr_mult 0.7576 | tok/s 205459 | grad_norm 0.137
+step 5070/13390 | loss 3.1030 | lr_mult 0.7566 | tok/s 205462 | grad_norm 0.150
+step 5080/13390 | loss 3.1223 | lr_mult 0.7555 | tok/s 205464 | grad_norm 0.125
+step 5090/13390 | loss 3.0907 | lr_mult 0.7544 | tok/s 205467 | grad_norm 0.137
+step 5100/13390 | loss 3.1063 | lr_mult 0.7533 | tok/s 205470 | grad_norm 0.140
+step 5110/13390 | loss 3.0812 | lr_mult 0.7522 | tok/s 205472 | grad_norm 0.129
+step 5120/13390 | loss 3.0830 | lr_mult 0.7511 | tok/s 205475 | grad_norm 0.168
+step 5130/13390 | loss 3.1109 | lr_mult 0.7500 | tok/s 205477 | grad_norm 0.136
+step 5140/13390 | loss 3.1003 | lr_mult 0.7489 | tok/s 205480 | grad_norm 0.152
+step 5150/13390 | loss 3.0845 | lr_mult 0.7478 | tok/s 205483 | grad_norm 0.134
+step 5160/13390 | loss 3.0945 | lr_mult 0.7467 | tok/s 205485 | grad_norm 0.150
+step 5170/13390 | loss 3.1036 | lr_mult 0.7456 | tok/s 205488 | grad_norm 0.124
+step 5180/13390 | loss 3.1198 | lr_mult 0.7445 | tok/s 205490 | grad_norm 0.138
+step 5190/13390 | loss 3.1169 | lr_mult 0.7434 | tok/s 205493 | grad_norm 0.156
+step 5200/13390 | loss 3.1058 | lr_mult 0.7423 | tok/s 205496 | grad_norm 0.176
+step 5210/13390 | loss 3.1222 | lr_mult 0.7412 | tok/s 205499 | grad_norm 0.130
+step 5220/13390 | loss 3.0677 | lr_mult 0.7401 | tok/s 205501 | grad_norm 0.130
+step 5230/13390 | loss 3.1159 | lr_mult 0.7389 | tok/s 205504 | grad_norm 0.153
+step 5240/13390 | loss 3.1146 | lr_mult 0.7378 | tok/s 205506 | grad_norm 0.135
+step 5250/13390 | loss 3.1216 | lr_mult 0.7367 | tok/s 205509 | grad_norm 0.160
+step 5260/13390 | loss 3.1126 | lr_mult 0.7356 | tok/s 205511 | grad_norm 0.140
+step 5270/13390 | loss 3.1008 | lr_mult 0.7345 | tok/s 205514 | grad_norm 0.154
+step 5280/13390 | loss 3.0846 | lr_mult 0.7334 | tok/s 205516 | grad_norm 0.146
+step 5290/13390 | loss 3.0881 | lr_mult 0.7322 | tok/s 205519 | grad_norm 0.130
+step 5300/13390 | loss 3.1077 | lr_mult 0.7311 | tok/s 205521 | grad_norm 0.165
+step 5310/13390 | loss 3.0878 | lr_mult 0.7300 | tok/s 205524 | grad_norm 0.145
+step 5320/13390 | loss 3.0909 | lr_mult 0.7289 | tok/s 205526 | grad_norm 0.163
+step 5330/13390 | loss 3.0815 | lr_mult 0.7277 | tok/s 205529 | grad_norm 0.152
+step 5340/13390 | loss 3.1063 | lr_mult 0.7266 | tok/s 205531 | grad_norm 0.133
+step 5350/13390 | loss 3.1174 | lr_mult 0.7255 | tok/s 205533 | grad_norm 0.131
+step 5360/13390 | loss 3.0736 | lr_mult 0.7243 | tok/s 205536 | grad_norm 0.127
+step 5370/13390 | loss 3.0655 | lr_mult 0.7232 | tok/s 205538 | grad_norm 0.127
+step 5380/13390 | loss 3.0507 | lr_mult 0.7221 | tok/s 205540 | grad_norm 0.131
+step 5390/13390 | loss 3.1038 | lr_mult 0.7209 | tok/s 205543 | grad_norm 0.137
+step 5400/13390 | loss 3.0822 | lr_mult 0.7198 | tok/s 205545 | grad_norm 0.146
+step 5410/13390 | loss 3.0880 | lr_mult 0.7187 | tok/s 205548 | grad_norm 0.141
+step 5420/13390 | loss 3.1074 | lr_mult 0.7175 | tok/s 205550 | grad_norm 0.140
+step 5430/13390 | loss 3.0862 | lr_mult 0.7164 | tok/s 205552 | grad_norm 0.184
+step 5440/13390 | loss 3.1349 | lr_mult 0.7152 | tok/s 205555 | grad_norm 0.116
+step 5450/13390 | loss 3.0893 | lr_mult 0.7141 | tok/s 205557 | grad_norm 0.146
+step 5460/13390 | loss 3.1086 | lr_mult 0.7129 | tok/s 205559 | grad_norm 0.156
+step 5470/13390 | loss 3.0613 | lr_mult 0.7118 | tok/s 205561 | grad_norm 0.128
+step 5480/13390 | loss 3.1154 | lr_mult 0.7106 | tok/s 205564 | grad_norm 0.151
+step 5490/13390 | loss 3.0619 | lr_mult 0.7095 | tok/s 205566 | grad_norm 0.137
+step 5500/13390 | loss 3.0970 | lr_mult 0.7083 | tok/s 205568 | grad_norm 0.149
+step 5500/13390 | val_loss 3.0695
+step 5510/13390 | loss 3.0732 | lr_mult 0.7072 | tok/s 205456 | grad_norm 0.129
+step 5520/13390 | loss 3.0968 | lr_mult 0.7060 | tok/s 205458 | grad_norm 0.138
+step 5530/13390 | loss 3.1159 | lr_mult 0.7049 | tok/s 205461 | grad_norm 0.142
+step 5540/13390 | loss 3.0664 | lr_mult 0.7037 | tok/s 205464 | grad_norm 0.156
+step 5550/13390 | loss 3.0640 | lr_mult 0.7026 | tok/s 205466 | grad_norm 0.125
+step 5560/13390 | loss 3.0620 | lr_mult 0.7014 | tok/s 205469 | grad_norm 0.136
+step 5570/13390 | loss 3.0825 | lr_mult 0.7002 | tok/s 205471 | grad_norm 0.165
+step 5580/13390 | loss 3.0789 | lr_mult 0.6991 | tok/s 205473 | grad_norm 0.145
+step 5590/13390 | loss 3.0704 | lr_mult 0.6979 | tok/s 205476 | grad_norm 0.149
+step 5600/13390 | loss 3.0924 | lr_mult 0.6967 | tok/s 205478 | grad_norm 0.126
+step 5610/13390 | loss 3.0553 | lr_mult 0.6956 | tok/s 205481 | grad_norm 0.118
+step 5620/13390 | loss 3.0733 | lr_mult 0.6944 | tok/s 205483 | grad_norm 0.137
+step 5630/13390 | loss 3.0693 | lr_mult 0.6932 | tok/s 205485 | grad_norm 0.143
+step 5640/13390 | loss 3.0846 | lr_mult 0.6921 | tok/s 205488 | grad_norm 0.129
+step 5650/13390 | loss 3.0760 | lr_mult 0.6909 | tok/s 205490 | grad_norm 0.140
+step 5660/13390 | loss 3.0888 | lr_mult 0.6897 | tok/s 205492 | grad_norm 0.148
+step 5670/13390 | loss 3.0419 | lr_mult 0.6886 | tok/s 205495 | grad_norm 0.133
+step 5680/13390 | loss 3.0499 | lr_mult 0.6874 | tok/s 205497 | grad_norm 0.151
+step 5690/13390 | loss 3.0996 | lr_mult 0.6862 | tok/s 205499 | grad_norm 0.131
+step 5700/13390 | loss 3.0649 | lr_mult 0.6850 | tok/s 205502 | grad_norm 0.135
+step 5710/13390 | loss 3.0576 | lr_mult 0.6839 | tok/s 205504 | grad_norm 0.143
+step 5720/13390 | loss 3.0723 | lr_mult 0.6827 | tok/s 205506 | grad_norm 0.112
+step 5730/13390 | loss 3.0645 | lr_mult 0.6815 | tok/s 205509 | grad_norm 0.154
+step 5740/13390 | loss 3.0744 | lr_mult 0.6803 | tok/s 205511 | grad_norm 0.139
+step 5750/13390 | loss 3.0764 | lr_mult 0.6791 | tok/s 205513 | grad_norm 0.143
+step 5760/13390 | loss 3.0933 | lr_mult 0.6779 | tok/s 205516 | grad_norm 0.177
+step 5770/13390 | loss 3.0717 | lr_mult 0.6768 | tok/s 205518 | grad_norm 0.124
+step 5780/13390 | loss 3.0530 | lr_mult 0.6756 | tok/s 205520 | grad_norm 0.142
+step 5790/13390 | loss 3.0676 | lr_mult 0.6744 | tok/s 205523 | grad_norm 0.135
+step 5800/13390 | loss 3.0876 | lr_mult 0.6732 | tok/s 205525 | grad_norm 0.131
+step 5810/13390 | loss 3.0363 | lr_mult 0.6720 | tok/s 205527 | grad_norm 0.136
+step 5820/13390 | loss 3.0760 | lr_mult 0.6708 | tok/s 205529 | grad_norm 0.142
+step 5830/13390 | loss 3.0674 | lr_mult 0.6696 | tok/s 205531 | grad_norm 0.157
+step 5840/13390 | loss 3.0309 | lr_mult 0.6684 | tok/s 205534 | grad_norm 0.134
+step 5850/13390 | loss 3.0728 | lr_mult 0.6672 | tok/s 205536 | grad_norm 0.160
+step 5860/13390 | loss 3.0671 | lr_mult 0.6660 | tok/s 205538 | grad_norm 0.139
+step 5870/13390 | loss 3.0817 | lr_mult 0.6648 | tok/s 205540 | grad_norm 0.150
+step 5880/13390 | loss 3.0316 | lr_mult 0.6636 | tok/s 205542 | grad_norm 0.128
+step 5890/13390 | loss 3.0710 | lr_mult 0.6624 | tok/s 205545 | grad_norm 0.140
+step 5900/13390 | loss 3.0721 | lr_mult 0.6612 | tok/s 205547 | grad_norm 0.146
+step 5910/13390 | loss 3.0479 | lr_mult 0.6600 | tok/s 205549 | grad_norm 0.147
+step 5920/13390 | loss 3.1020 | lr_mult 0.6588 | tok/s 205551 | grad_norm 0.128
+step 5930/13390 | loss 3.0768 | lr_mult 0.6576 | tok/s 205553 | grad_norm 0.135
+step 5940/13390 | loss 3.0630 | lr_mult 0.6564 | tok/s 205556 | grad_norm 0.131
+step 5950/13390 | loss 3.0555 | lr_mult 0.6552 | tok/s 205558 | grad_norm 0.133
+step 5960/13390 | loss 3.0316 | lr_mult 0.6540 | tok/s 205560 | grad_norm 0.155
+step 5970/13390 | loss 3.0712 | lr_mult 0.6528 | tok/s 205562 | grad_norm 0.120
+step 5980/13390 | loss 3.0611 | lr_mult 0.6516 | tok/s 205564 | grad_norm 0.125
+step 5990/13390 | loss 3.0705 | lr_mult 0.6504 | tok/s 205566 | grad_norm 0.135
+step 6000/13390 | loss 3.0714 | lr_mult 0.6492 | tok/s 205568 | grad_norm 0.143
+step 6000/13390 | val_loss 3.0449
+step 6010/13390 | loss 3.0669 | lr_mult 0.6480 | tok/s 205465 | grad_norm 0.132
+step 6020/13390 | loss 3.0533 | lr_mult 0.6468 | tok/s 205467 | grad_norm 0.122
+step 6030/13390 | loss 3.0474 | lr_mult 0.6456 | tok/s 205470 | grad_norm 0.145
+step 6040/13390 | loss 3.0673 | lr_mult 0.6443 | tok/s 205472 | grad_norm 0.127
+step 6050/13390 | loss 3.0761 | lr_mult 0.6431 | tok/s 205474 | grad_norm 0.128
+step 6060/13390 | loss 3.0166 | lr_mult 0.6419 | tok/s 205476 | grad_norm 0.138
+step 6070/13390 | loss 3.0558 | lr_mult 0.6407 | tok/s 205478 | grad_norm 0.133
+step 6080/13390 | loss 3.0649 | lr_mult 0.6395 | tok/s 205481 | grad_norm 0.138
+step 6090/13390 | loss 3.0545 | lr_mult 0.6383 | tok/s 205483 | grad_norm 0.134
+step 6100/13390 | loss 3.0512 | lr_mult 0.6370 | tok/s 205485 | grad_norm 0.135
+step 6110/13390 | loss 3.0584 | lr_mult 0.6358 | tok/s 205487 | grad_norm 0.143
+step 6120/13390 | loss 3.0496 | lr_mult 0.6346 | tok/s 205489 | grad_norm 0.128
+step 6130/13390 | loss 3.0634 | lr_mult 0.6334 | tok/s 205491 | grad_norm 0.115
+step 6140/13390 | loss 3.0522 | lr_mult 0.6322 | tok/s 205494 | grad_norm 0.127
+step 6150/13390 | loss 3.0459 | lr_mult 0.6309 | tok/s 205496 | grad_norm 0.151
+step 6160/13390 | loss 3.0406 | lr_mult 0.6297 | tok/s 205498 | grad_norm 0.131
+step 6170/13390 | loss 3.0302 | lr_mult 0.6285 | tok/s 205500 | grad_norm 0.133
+step 6180/13390 | loss 3.0520 | lr_mult 0.6273 | tok/s 205502 | grad_norm 0.130
+step 6190/13390 | loss 3.0489 | lr_mult 0.6260 | tok/s 205505 | grad_norm 0.145
+step 6200/13390 | loss 3.0474 | lr_mult 0.6248 | tok/s 205507 | grad_norm 0.135
+step 6210/13390 | loss 3.0268 | lr_mult 0.6236 | tok/s 205509 | grad_norm 0.126
+step 6220/13390 | loss 3.0594 | lr_mult 0.6224 | tok/s 205511 | grad_norm 0.131
+step 6230/13390 | loss 3.0531 | lr_mult 0.6211 | tok/s 205513 | grad_norm 0.121
+step 6240/13390 | loss 3.0328 | lr_mult 0.6199 | tok/s 205515 | grad_norm 0.157
+step 6250/13390 | loss 3.0293 | lr_mult 0.6187 | tok/s 205518 | grad_norm 0.133
+step 6260/13390 | loss 3.0754 | lr_mult 0.6174 | tok/s 205520 | grad_norm 0.134
+step 6270/13390 | loss 3.0229 | lr_mult 0.6162 | tok/s 205522 | grad_norm 0.159
+step 6280/13390 | loss 3.0599 | lr_mult 0.6150 | tok/s 205524 | grad_norm 0.131
+step 6290/13390 | loss 3.0787 | lr_mult 0.6137 | tok/s 205526 | grad_norm 0.139
+step 6300/13390 | loss 3.0507 | lr_mult 0.6125 | tok/s 205528 | grad_norm 0.130
+step 6310/13390 | loss 3.0336 | lr_mult 0.6113 | tok/s 205531 | grad_norm 0.142
+step 6320/13390 | loss 3.0406 | lr_mult 0.6100 | tok/s 205533 | grad_norm 0.126
+step 6330/13390 | loss 3.0346 | lr_mult 0.6088 | tok/s 205535 | grad_norm 0.121
+step 6340/13390 | loss 3.0643 | lr_mult 0.6075 | tok/s 205537 | grad_norm 0.123
+step 6350/13390 | loss 3.0592 | lr_mult 0.6063 | tok/s 205539 | grad_norm 0.129
+step 6360/13390 | loss 3.0592 | lr_mult 0.6051 | tok/s 205541 | grad_norm 0.137
+step 6370/13390 | loss 3.0222 | lr_mult 0.6038 | tok/s 205543 | grad_norm 0.138
+step 6380/13390 | loss 3.0316 | lr_mult 0.6026 | tok/s 205545 | grad_norm 0.159
+step 6390/13390 | loss 3.0358 | lr_mult 0.6014 | tok/s 205548 | grad_norm 0.130
+step 6400/13390 | loss 3.0382 | lr_mult 0.6001 | tok/s 205550 | grad_norm 0.142
+step 6410/13390 | loss 3.0538 | lr_mult 0.5989 | tok/s 205552 | grad_norm 0.117
+step 6420/13390 | loss 3.0555 | lr_mult 0.5976 | tok/s 205554 | grad_norm 0.146
+step 6430/13390 | loss 3.0116 | lr_mult 0.5964 | tok/s 205556 | grad_norm 0.122
+step 6440/13390 | loss 3.0516 | lr_mult 0.5951 | tok/s 205558 | grad_norm 0.148
+step 6450/13390 | loss 3.0422 | lr_mult 0.5939 | tok/s 205560 | grad_norm 0.143
+step 6460/13390 | loss 3.0241 | lr_mult 0.5926 | tok/s 205562 | grad_norm 0.119
+step 6470/13390 | loss 3.0381 | lr_mult 0.5914 | tok/s 205564 | grad_norm 0.134
+step 6480/13390 | loss 3.0389 | lr_mult 0.5902 | tok/s 205566 | grad_norm 0.121
+step 6490/13390 | loss 3.0430 | lr_mult 0.5889 | tok/s 205567 | grad_norm 0.130
+step 6500/13390 | loss 3.0655 | lr_mult 0.5877 | tok/s 205569 | grad_norm 0.129
+step 6500/13390 | val_loss 3.0236
+step 6510/13390 | loss 3.0423 | lr_mult 0.5864 | tok/s 205474 | grad_norm 0.130
+step 6520/13390 | loss 3.0297 | lr_mult 0.5852 | tok/s 205476 | grad_norm 0.147
+step 6530/13390 | loss 3.0561 | lr_mult 0.5839 | tok/s 205478 | grad_norm 0.154
+step 6540/13390 | loss 3.0331 | lr_mult 0.5827 | tok/s 205481 | grad_norm 0.123
+step 6550/13390 | loss 3.0504 | lr_mult 0.5814 | tok/s 205483 | grad_norm 0.135
+step 6560/13390 | loss 3.0326 | lr_mult 0.5802 | tok/s 205485 | grad_norm 0.118
+step 6570/13390 | loss 3.0406 | lr_mult 0.5789 | tok/s 205487 | grad_norm 0.118
+step 6580/13390 | loss 3.0235 | lr_mult 0.5777 | tok/s 205489 | grad_norm 0.130
+step 6590/13390 | loss 3.0378 | lr_mult 0.5764 | tok/s 205491 | grad_norm 0.145
+step 6600/13390 | loss 3.0509 | lr_mult 0.5751 | tok/s 205493 | grad_norm 0.126
+step 6610/13390 | loss 3.0581 | lr_mult 0.5739 | tok/s 205495 | grad_norm 0.122
+step 6620/13390 | loss 3.0145 | lr_mult 0.5726 | tok/s 205497 | grad_norm 0.133
+step 6630/13390 | loss 3.0174 | lr_mult 0.5714 | tok/s 205499 | grad_norm 0.140
+step 6640/13390 | loss 3.0278 | lr_mult 0.5701 | tok/s 205501 | grad_norm 0.118
+step 6650/13390 | loss 3.0283 | lr_mult 0.5689 | tok/s 205503 | grad_norm 0.133
+step 6660/13390 | loss 3.0398 | lr_mult 0.5676 | tok/s 205505 | grad_norm 0.127
+step 6670/13390 | loss 3.0192 | lr_mult 0.5664 | tok/s 205507 | grad_norm 0.127
+step 6680/13390 | loss 3.0152 | lr_mult 0.5651 | tok/s 205509 | grad_norm 0.125
+step 6690/13390 | loss 3.0187 | lr_mult 0.5638 | tok/s 205511 | grad_norm 0.143
+step 6700/13390 | loss 3.0062 | lr_mult 0.5626 | tok/s 205513 | grad_norm 0.126
+step 6710/13390 | loss 3.0258 | lr_mult 0.5613 | tok/s 205515 | grad_norm 0.135
+step 6720/13390 | loss 3.0624 | lr_mult 0.5601 | tok/s 205517 | grad_norm 0.132
+step 6730/13390 | loss 3.0269 | lr_mult 0.5588 | tok/s 205519 | grad_norm 0.137
+step 6740/13390 | loss 3.0273 | lr_mult 0.5576 | tok/s 205521 | grad_norm 0.115
+step 6750/13390 | loss 3.0367 | lr_mult 0.5563 | tok/s 205523 | grad_norm 0.118
+step 6760/13390 | loss 3.0656 | lr_mult 0.5550 | tok/s 205525 | grad_norm 0.133
+step 6770/13390 | loss 3.0372 | lr_mult 0.5538 | tok/s 205527 | grad_norm 0.136
+step 6780/13390 | loss 3.0267 | lr_mult 0.5525 | tok/s 205528 | grad_norm 0.126
+step 6790/13390 | loss 3.0350 | lr_mult 0.5513 | tok/s 205530 | grad_norm 0.116
+step 6800/13390 | loss 3.0108 | lr_mult 0.5500 | tok/s 205532 | grad_norm 0.125
+step 6810/13390 | loss 3.0473 | lr_mult 0.5487 | tok/s 205534 | grad_norm 0.128
+step 6820/13390 | loss 3.0328 | lr_mult 0.5475 | tok/s 205536 | grad_norm 0.126
+step 6830/13390 | loss 3.0086 | lr_mult 0.5462 | tok/s 205538 | grad_norm 0.114
+step 6840/13390 | loss 3.0338 | lr_mult 0.5449 | tok/s 205540 | grad_norm 0.128
+step 6850/13390 | loss 3.0318 | lr_mult 0.5437 | tok/s 205542 | grad_norm 0.125
+step 6860/13390 | loss 3.0086 | lr_mult 0.5424 | tok/s 205544 | grad_norm 0.123
+step 6870/13390 | loss 3.0149 | lr_mult 0.5412 | tok/s 205546 | grad_norm 0.133
+step 6880/13390 | loss 3.0352 | lr_mult 0.5399 | tok/s 205548 | grad_norm 0.133
+step 6890/13390 | loss 3.0294 | lr_mult 0.5386 | tok/s 205550 | grad_norm 0.118
+step 6900/13390 | loss 2.9989 | lr_mult 0.5374 | tok/s 205552 | grad_norm 0.122
+step 6910/13390 | loss 3.0140 | lr_mult 0.5361 | tok/s 205553 | grad_norm 0.125
+step 6920/13390 | loss 3.0403 | lr_mult 0.5348 | tok/s 205555 | grad_norm 0.116
+step 6930/13390 | loss 3.0293 | lr_mult 0.5336 | tok/s 205557 | grad_norm 0.118
+step 6940/13390 | loss 3.0045 | lr_mult 0.5323 | tok/s 205559 | grad_norm 0.131
+step 6950/13390 | loss 3.0426 | lr_mult 0.5310 | tok/s 205561 | grad_norm 0.137
+step 6960/13390 | loss 3.0239 | lr_mult 0.5298 | tok/s 205563 | grad_norm 0.147
+step 6970/13390 | loss 3.0337 | lr_mult 0.5285 | tok/s 205565 | grad_norm 0.128
+step 6980/13390 | loss 3.0276 | lr_mult 0.5272 | tok/s 205566 | grad_norm 0.143
+step 6990/13390 | loss 3.0177 | lr_mult 0.5260 | tok/s 205568 | grad_norm 0.119
+step 7000/13390 | loss 3.0030 | lr_mult 0.5247 | tok/s 205570 | grad_norm 0.131
+step 7000/13390 | val_loss 3.0045
+step 7010/13390 | loss 3.0544 | lr_mult 0.5234 | tok/s 205482 | grad_norm 0.135
+step 7020/13390 | loss 3.0375 | lr_mult 0.5222 | tok/s 205484 | grad_norm 0.128
+step 7030/13390 | loss 3.0245 | lr_mult 0.5209 | tok/s 205486 | grad_norm 0.116
+step 7040/13390 | loss 3.0075 | lr_mult 0.5196 | tok/s 205488 | grad_norm 0.124
+step 7050/13390 | loss 3.0127 | lr_mult 0.5184 | tok/s 205490 | grad_norm 0.132
+step 7060/13390 | loss 3.0166 | lr_mult 0.5171 | tok/s 205492 | grad_norm 0.130
+step 7070/13390 | loss 3.0410 | lr_mult 0.5158 | tok/s 205493 | grad_norm 0.134
+step 7080/13390 | loss 3.0540 | lr_mult 0.5146 | tok/s 205495 | grad_norm 0.107
+step 7090/13390 | loss 3.0296 | lr_mult 0.5133 | tok/s 205497 | grad_norm 0.136
+step 7100/13390 | loss 3.0181 | lr_mult 0.5120 | tok/s 205499 | grad_norm 0.125
+step 7110/13390 | loss 3.0340 | lr_mult 0.5108 | tok/s 205501 | grad_norm 0.121
+step 7120/13390 | loss 3.0215 | lr_mult 0.5095 | tok/s 205503 | grad_norm 0.117
+step 7130/13390 | loss 3.0088 | lr_mult 0.5082 | tok/s 205505 | grad_norm 0.127
+step 7140/13390 | loss 3.0252 | lr_mult 0.5070 | tok/s 205507 | grad_norm 0.126
+step 7150/13390 | loss 3.0303 | lr_mult 0.5057 | tok/s 205509 | grad_norm 0.113
+step 7160/13390 | loss 3.0517 | lr_mult 0.5044 | tok/s 205511 | grad_norm 0.141
+step 7170/13390 | loss 2.9832 | lr_mult 0.5032 | tok/s 205512 | grad_norm 0.117
+step 7180/13390 | loss 3.0279 | lr_mult 0.5019 | tok/s 205514 | grad_norm 0.134
+step 7190/13390 | loss 3.0429 | lr_mult 0.5006 | tok/s 205516 | grad_norm 0.112
+step 7200/13390 | loss 3.0082 | lr_mult 0.4994 | tok/s 205518 | grad_norm 0.119
+step 7210/13390 | loss 2.9897 | lr_mult 0.4981 | tok/s 205520 | grad_norm 0.119
+step 7220/13390 | loss 3.0180 | lr_mult 0.4968 | tok/s 205521 | grad_norm 0.133
+step 7230/13390 | loss 3.0086 | lr_mult 0.4956 | tok/s 205523 | grad_norm 0.127
+step 7240/13390 | loss 3.0054 | lr_mult 0.4943 | tok/s 205525 | grad_norm 0.130
+step 7250/13390 | loss 2.9926 | lr_mult 0.4930 | tok/s 205527 | grad_norm 0.124
+step 7260/13390 | loss 2.9994 | lr_mult 0.4918 | tok/s 205529 | grad_norm 0.136
+step 7270/13390 | loss 3.0310 | lr_mult 0.4905 | tok/s 205530 | grad_norm 0.115
+step 7280/13390 | loss 3.0152 | lr_mult 0.4892 | tok/s 205532 | grad_norm 0.131
+step 7290/13390 | loss 3.0383 | lr_mult 0.4880 | tok/s 205534 | grad_norm 0.106
+step 7300/13390 | loss 2.9939 | lr_mult 0.4867 | tok/s 205536 | grad_norm 0.121
+step 7310/13390 | loss 3.0196 | lr_mult 0.4854 | tok/s 205537 | grad_norm 0.113
+step 7320/13390 | loss 3.0300 | lr_mult 0.4842 | tok/s 205539 | grad_norm 0.112
+step 7330/13390 | loss 3.0119 | lr_mult 0.4829 | tok/s 205541 | grad_norm 0.122
+step 7340/13390 | loss 3.0332 | lr_mult 0.4816 | tok/s 205543 | grad_norm 0.132
+step 7350/13390 | loss 3.0077 | lr_mult 0.4804 | tok/s 205545 | grad_norm 0.120
+step 7360/13390 | loss 3.0171 | lr_mult 0.4791 | tok/s 205546 | grad_norm 0.129
+step 7370/13390 | loss 3.0281 | lr_mult 0.4778 | tok/s 205548 | grad_norm 0.117
+step 7380/13390 | loss 3.0341 | lr_mult 0.4766 | tok/s 205550 | grad_norm 0.115
+step 7390/13390 | loss 3.0222 | lr_mult 0.4753 | tok/s 205552 | grad_norm 0.112
+step 7400/13390 | loss 3.0139 | lr_mult 0.4740 | tok/s 205553 | grad_norm 0.123
+step 7410/13390 | loss 2.9859 | lr_mult 0.4728 | tok/s 205555 | grad_norm 0.131
+step 7420/13390 | loss 3.0015 | lr_mult 0.4715 | tok/s 205557 | grad_norm 0.130
+step 7430/13390 | loss 3.0019 | lr_mult 0.4702 | tok/s 205559 | grad_norm 0.140
+step 7440/13390 | loss 3.0222 | lr_mult 0.4690 | tok/s 205560 | grad_norm 0.115
+step 7450/13390 | loss 2.9845 | lr_mult 0.4677 | tok/s 205562 | grad_norm 0.132
+step 7460/13390 | loss 3.0292 | lr_mult 0.4664 | tok/s 205564 | grad_norm 0.116
+step 7470/13390 | loss 3.0037 | lr_mult 0.4652 | tok/s 205565 | grad_norm 0.122
+step 7480/13390 | loss 2.9980 | lr_mult 0.4639 | tok/s 205567 | grad_norm 0.131
+step 7490/13390 | loss 3.0031 | lr_mult 0.4626 | tok/s 205569 | grad_norm 0.127
+step 7500/13390 | loss 3.0264 | lr_mult 0.4614 | tok/s 205571 | grad_norm 0.116
+step 7500/13390 | val_loss 2.9850
+step 7510/13390 | loss 2.9818 | lr_mult 0.4601 | tok/s 205488 | grad_norm 0.117
+step 7520/13390 | loss 3.0293 | lr_mult 0.4588 | tok/s 205490 | grad_norm 0.143
+step 7530/13390 | loss 2.9899 | lr_mult 0.4576 | tok/s 205492 | grad_norm 0.119
+step 7540/13390 | loss 3.0099 | lr_mult 0.4563 | tok/s 205494 | grad_norm 0.126
+step 7550/13390 | loss 2.9867 | lr_mult 0.4551 | tok/s 205495 | grad_norm 0.120
+step 7560/13390 | loss 2.9883 | lr_mult 0.4538 | tok/s 205497 | grad_norm 0.121
+step 7570/13390 | loss 2.9997 | lr_mult 0.4525 | tok/s 205499 | grad_norm 0.116
+step 7580/13390 | loss 2.9791 | lr_mult 0.4513 | tok/s 205501 | grad_norm 0.135
+step 7590/13390 | loss 2.9674 | lr_mult 0.4500 | tok/s 205503 | grad_norm 0.117
+step 7600/13390 | loss 2.9924 | lr_mult 0.4487 | tok/s 205504 | grad_norm 0.137
+step 7610/13390 | loss 3.0006 | lr_mult 0.4475 | tok/s 205506 | grad_norm 0.119
+step 7620/13390 | loss 2.9657 | lr_mult 0.4462 | tok/s 205508 | grad_norm 0.126
+step 7630/13390 | loss 2.9927 | lr_mult 0.4450 | tok/s 205510 | grad_norm 0.116
+step 7640/13390 | loss 3.0011 | lr_mult 0.4437 | tok/s 205511 | grad_norm 0.118
+step 7650/13390 | loss 2.9627 | lr_mult 0.4424 | tok/s 205513 | grad_norm 0.117
+step 7660/13390 | loss 3.0091 | lr_mult 0.4412 | tok/s 205515 | grad_norm 0.131
+step 7670/13390 | loss 2.9750 | lr_mult 0.4399 | tok/s 205517 | grad_norm 0.121
+step 7680/13390 | loss 3.0008 | lr_mult 0.4387 | tok/s 205519 | grad_norm 0.121
+step 7690/13390 | loss 3.0022 | lr_mult 0.4374 | tok/s 205520 | grad_norm 0.113
+step 7700/13390 | loss 2.9911 | lr_mult 0.4362 | tok/s 205522 | grad_norm 0.115
+step 7710/13390 | loss 3.0036 | lr_mult 0.4349 | tok/s 205524 | grad_norm 0.114
+step 7720/13390 | loss 2.9736 | lr_mult 0.4336 | tok/s 205526 | grad_norm 0.131
+step 7730/13390 | loss 2.9835 | lr_mult 0.4324 | tok/s 205527 | grad_norm 0.127
+step 7740/13390 | loss 2.9806 | lr_mult 0.4311 | tok/s 205529 | grad_norm 0.120
+step 7750/13390 | loss 2.9787 | lr_mult 0.4299 | tok/s 205531 | grad_norm 0.109
+step 7760/13390 | loss 2.9731 | lr_mult 0.4286 | tok/s 205532 | grad_norm 0.117
+step 7770/13390 | loss 3.0203 | lr_mult 0.4274 | tok/s 205534 | grad_norm 0.124
+step 7780/13390 | loss 2.9829 | lr_mult 0.4261 | tok/s 205536 | grad_norm 0.117
+step 7790/13390 | loss 2.9884 | lr_mult 0.4249 | tok/s 205538 | grad_norm 0.116
+step 7800/13390 | loss 3.0028 | lr_mult 0.4236 | tok/s 205539 | grad_norm 0.121
+step 7810/13390 | loss 2.9846 | lr_mult 0.4223 | tok/s 205541 | grad_norm 0.115
+step 7820/13390 | loss 2.9784 | lr_mult 0.4211 | tok/s 205543 | grad_norm 0.129
+step 7830/13390 | loss 2.9783 | lr_mult 0.4198 | tok/s 205545 | grad_norm 0.146
+step 7840/13390 | loss 2.9749 | lr_mult 0.4186 | tok/s 205546 | grad_norm 0.112
+step 7850/13390 | loss 2.9982 | lr_mult 0.4173 | tok/s 205548 | grad_norm 0.130
+step 7860/13390 | loss 2.9824 | lr_mult 0.4161 | tok/s 205550 | grad_norm 0.133
+step 7870/13390 | loss 3.0019 | lr_mult 0.4148 | tok/s 205551 | grad_norm 0.131
+step 7880/13390 | loss 2.9816 | lr_mult 0.4136 | tok/s 205553 | grad_norm 0.124
+step 7890/13390 | loss 2.9740 | lr_mult 0.4123 | tok/s 205555 | grad_norm 0.121
+step 7900/13390 | loss 2.9720 | lr_mult 0.4111 | tok/s 205556 | grad_norm 0.117
+step 7910/13390 | loss 2.9940 | lr_mult 0.4098 | tok/s 205558 | grad_norm 0.130
+step 7920/13390 | loss 3.0041 | lr_mult 0.4086 | tok/s 205560 | grad_norm 0.114
+step 7930/13390 | loss 2.9882 | lr_mult 0.4074 | tok/s 205562 | grad_norm 0.115
+step 7940/13390 | loss 2.9999 | lr_mult 0.4061 | tok/s 205563 | grad_norm 0.116
+step 7950/13390 | loss 3.0023 | lr_mult 0.4049 | tok/s 205565 | grad_norm 0.113
+step 7960/13390 | loss 2.9786 | lr_mult 0.4036 | tok/s 205567 | grad_norm 0.116
+step 7970/13390 | loss 2.9616 | lr_mult 0.4024 | tok/s 205568 | grad_norm 0.115
+step 7980/13390 | loss 2.9981 | lr_mult 0.4011 | tok/s 205570 | grad_norm 0.122
+step 7990/13390 | loss 2.9965 | lr_mult 0.3999 | tok/s 205571 | grad_norm 0.116
+step 8000/13390 | loss 2.9600 | lr_mult 0.3986 | tok/s 205573 | grad_norm 0.116
+step 8000/13390 | val_loss 2.9682
+step 8010/13390 | loss 2.9866 | lr_mult 0.3974 | tok/s 205496 | grad_norm 0.126
+W0506 02:03:04.815000 226920 site-packages/torch/distributed/elastic/agent/server/api.py:704] Received Signals.SIGHUP death signal, shutting down workers
+W0506 02:03:04.817000 226920 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 227075 closing signal SIGHUP
+W0506 02:03:04.820000 226920 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 227076 closing signal SIGHUP
+W0506 02:03:04.855000 226920 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 227077 closing signal SIGHUP
+W0506 02:03:04.891000 226920 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 227078 closing signal SIGHUP
+W0506 02:03:04.926000 226920 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 227079 closing signal SIGHUP
+W0506 02:03:04.961000 226920 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 227080 closing signal SIGHUP
+W0506 02:03:05.000000 226920 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 227081 closing signal SIGHUP
+W0506 02:03:05.036000 226920 site-packages/torch/distributed/elastic/multiprocessing/api.py:897] Sending process 227082 closing signal SIGHUP
+Traceback (most recent call last):
+  File "/opt/conda/envs/orscale/bin/torchrun", line 6, in <module>
+    sys.exit(main())
+  File "/opt/conda/envs/orscale/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 355, in wrapper
+    return f(*args, **kwargs)
+  File "/opt/conda/envs/orscale/lib/python3.10/site-packages/torch/distributed/run.py", line 919, in main
+    run(args)
+  File "/opt/conda/envs/orscale/lib/python3.10/site-packages/torch/distributed/run.py", line 910, in run
+    elastic_launch(
+  File "/opt/conda/envs/orscale/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 138, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/opt/conda/envs/orscale/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 260, in launch_agent
+    result = agent.run()
+  File "/opt/conda/envs/orscale/lib/python3.10/site-packages/torch/distributed/elastic/metrics/api.py", line 137, in wrapper
+    result = f(*args, **kwargs)
+  File "/opt/conda/envs/orscale/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 696, in run
+    result = self._invoke_run(role)
+  File "/opt/conda/envs/orscale/lib/python3.10/site-packages/torch/distributed/elastic/agent/server/api.py", line 855, in _invoke_run
+    time.sleep(monitor_interval)
+  File "/opt/conda/envs/orscale/lib/python3.10/site-packages/torch/distributed/elastic/multiprocessing/api.py", line 84, in _terminate_process_handler
+    raise SignalException(f"Process {os.getpid()} got signal: {sigval}", sigval=sigval)
+torch.distributed.elastic.multiprocessing.api.SignalException: Process 226920 got signal: 1

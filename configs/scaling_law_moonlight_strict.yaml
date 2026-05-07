@@ -134,19 +134,17 @@ presets:
     tokens: 28.54e9
     seq_len: 4096
     batch_examples: 384
-    # mbs=12 (accum=4) is workable here BECAUSE checkpoint_mlp is on:
-    # selective MLP recompute drops per-layer activation memory by ~70%,
-    # easily offsetting the doubled mbs vs the no-AC plan (was mbs=8).
-    # Net wall-clock is ~+5% recompute cost minus larger-batch utilization
-    # gain; should land roughly throughput-neutral with much more headroom.
-    micro_batch_size: 12
+    # mbs=8 (accum=6) is the no-activation-checkpointing plan. mbs=12 only
+    # works reliably with model.checkpoint_mlp=true; without it, torch.compile
+    # can materialize large fp32 norm/MLP workspaces at step 0.
+    micro_batch_size: 8
     lr: 8.561e-4
     optimizer_lrs:
       orscale_muon_moonlight: 2.140e-3
     overrides:
       training.save_every: 18146
       training.compile: true
-      model.checkpoint_mlp: true
+      model.checkpoint_mlp: false
   - name: moonlight_1_5b
     params: 1.5e9
     tokens: 38.91e9

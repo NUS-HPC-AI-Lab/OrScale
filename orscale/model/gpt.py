@@ -39,6 +39,10 @@ class GPTConfig:
     pos_encoding: str = "rope"      # "rope" or "learned"
     bias: bool = False
     tie_weights: bool = True
+    # Compute supervised LM loss in token chunks instead of materializing the
+    # full (batch, sequence, vocab) logits tensor. Set <= 0 to use the old
+    # full-logits loss path.
+    loss_chunk_size: int = 2048
     # Selective activation checkpointing: when True, recompute the MLP block's
     # forward during backward instead of storing its activations. The MLP holds
     # ~70% of per-layer activation memory but only ~30% of per-layer FLOPs in
@@ -118,7 +122,8 @@ class RMSNorm(nn.Module):
         self.eps = eps
 
     def forward(self, x: Tensor) -> Tensor:
-        return F.rms_norm(x, self.weight.shape, self.weight, self.eps)
+        weight = self.weight.to(dtype=x.dtype) if self.weight.dtype != x.dtype else self.weight
+        return F.rms_norm(x, self.weight.shape, weight, self.eps)
 
 
 def build_norm(dim: int, norm_type: str) -> nn.Module:
@@ -360,6 +365,26 @@ class GPT(nn.Module):
             else:
                 p.muon_class = "nonmatrix"
 
+    def _chunked_loss(self, x: Tensor, targets: Tensor) -> Tensor:
+        flat_x = x.reshape(-1, x.size(-1))
+        flat_targets = targets.reshape(-1)
+        chunk_size = int(self.config.loss_chunk_size)
+
+        if chunk_size <= 0 or flat_x.size(0) <= chunk_size:
+            logits = self.lm_head(flat_x)
+            return F.cross_entropy(logits, flat_targets, reduction="mean")
+
+        loss_sum = flat_x.new_zeros(())
+        for start in range(0, flat_x.size(0), chunk_size):
+            end = min(start + chunk_size, flat_x.size(0))
+            logits = self.lm_head(flat_x[start:end])
+            loss_sum = loss_sum + F.cross_entropy(
+                logits,
+                flat_targets[start:end],
+                reduction="sum",
+            )
+        return loss_sum / flat_targets.numel()
+
     def forward(
         self,
         input_ids: Tensor,
@@ -372,8 +397,8 @@ class GPT(nn.Module):
 
         Returns:
             dict with keys:
-                'logits': (B, T, V) float tensor
-                'loss': scalar (present only if targets is provided)
+                'logits': (B, T, V) float tensor when targets are not provided
+                'loss': scalar when targets are provided
         """
         B, T = input_ids.shape
         x = self.tok_emb(input_ids)
@@ -390,19 +415,12 @@ class GPT(nn.Module):
             x = block(x, cos, sin)
 
         x = self.final_norm(x)
-        logits = self.lm_head(x)
-
-        result = {"logits": logits}
 
         if targets is not None:
-            loss = F.cross_entropy(
-                logits.view(-1, logits.size(-1)),
-                targets.view(-1),
-                reduction="mean",
-            )
-            result["loss"] = loss
+            return {"loss": self._chunked_loss(x, targets)}
 
-        return result
+        logits = self.lm_head(x)
+        return {"logits": logits}
 
     def count_parameters(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

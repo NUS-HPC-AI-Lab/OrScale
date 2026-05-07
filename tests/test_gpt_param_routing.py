@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-from orscale.model.gpt import GPT, GPTConfig
+from orscale.model.gpt import GPT, GPTConfig, RMSNorm
 from orscale.optim import _split_params, build_optimizer
 
 
@@ -69,6 +70,35 @@ def test_rmsnorm_params_use_adamw():
     for name, p in model.named_parameters():
         if "norm" in name:
             assert p.muon_class == "nonmatrix", f"{name} should be nonmatrix (got {p.muon_class})"
+
+
+def test_rmsnorm_preserves_activation_dtype():
+    norm = RMSNorm(8)
+    x = torch.randn(2, 4, 8, dtype=torch.bfloat16)
+
+    out = norm(x)
+
+    assert out.dtype == x.dtype
+
+
+def test_chunked_loss_matches_full_logits_loss():
+    torch.manual_seed(0)
+    cfg = _make_cfg(pos_encoding="learned", tie_weights=False)
+    cfg.loss_chunk_size = 3
+    model = GPT(cfg).eval()
+    x = torch.randint(0, cfg.vocab_size, (2, 8))
+    y = torch.randint(0, cfg.vocab_size, (2, 8))
+
+    out = model(x, y)
+    logits = model(x)["logits"]
+    expected = F.cross_entropy(
+        logits.reshape(-1, logits.size(-1)),
+        y.reshape(-1),
+        reduction="mean",
+    )
+
+    assert "logits" not in out
+    torch.testing.assert_close(out["loss"], expected)
 
 
 def test_hidden_linear_weights_use_muon():
