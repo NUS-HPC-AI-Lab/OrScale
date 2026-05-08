@@ -37,8 +37,8 @@ def test_create_dataloader_keeps_bin_shards_lazy(tmp_path):
 
     x0, y0 = dataset[0]
     assert dataset._shards is not None
-    np.testing.assert_array_equal(x0.numpy(), np.array([0, 1, 2, 3]))
-    np.testing.assert_array_equal(y0.numpy(), np.array([1, 2, 3, 4]))
+    assert x0.tolist() == [0, 1, 2, 3]
+    assert y0.tolist() == [1, 2, 3, 4]
 
     batch_x, batch_y = next(iter(loader))
     assert batch_x.shape == (2, 4)
@@ -53,11 +53,11 @@ def test_sharded_dataset_spans_multiple_files(tmp_path):
 
     dataset = ShardedTokenDataset([str(shard_a), str(shard_b)], seq_len=4)
 
-    samples = [dataset[i][0].numpy() for i in range(len(dataset))]
-    np.testing.assert_array_equal(samples[0], np.array([0, 1, 2, 3]))
-    np.testing.assert_array_equal(samples[1], np.array([4, 5, 6, 7]))
-    np.testing.assert_array_equal(samples[2], np.array([100, 101, 102, 103]))
-    np.testing.assert_array_equal(samples[3], np.array([104, 105, 106, 107]))
+    samples = [dataset[i][0].tolist() for i in range(len(dataset))]
+    assert samples[0] == [0, 1, 2, 3]
+    assert samples[1] == [4, 5, 6, 7]
+    assert samples[2] == [100, 101, 102, 103]
+    assert samples[3] == [104, 105, 106, 107]
 
 
 if __name__ == "__main__":

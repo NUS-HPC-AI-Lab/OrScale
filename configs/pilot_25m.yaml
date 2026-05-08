@@ -8,8 +8,8 @@ model:
   tie_weights: true
 
 data:
-  train_pattern: "/home/svu/e0572481/scratch/fineweb10B/fineweb_train_*.bin"
-  val_pattern: "/home/svu/e0572481/scratch/fineweb10B/fineweb_val_*.bin"
+  train_pattern: "data/fineweb10B/fineweb_train_*.bin"
+  val_pattern: "data/fineweb10B/fineweb_val_*.bin"
   streaming: false
 
 training:
@@ -44,5 +44,5 @@ diagnostics:
   heavy_log_every: 500
 
 logging:
-  wandb_project: orscale
+  wandb_project: null
   wandb_group: pilot_25m

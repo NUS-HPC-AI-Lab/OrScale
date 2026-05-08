@@ -57,5 +57,5 @@ diagnostics:
   heavy_log_every: 1000
 
 logging:
-  wandb_project: orscale-vision
+  wandb_project: null
   wandb_group: imagenet_resnet50_bs32k

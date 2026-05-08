@@ -22,6 +22,9 @@ checkpoints/
 
 # Sweep logs
 sweeps/
+results/
+reports/
+*.log
 
 # W&B
 wandb/

@@ -123,7 +123,10 @@ class RMSNorm(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         weight = self.weight.to(dtype=x.dtype) if self.weight.dtype != x.dtype else self.weight
-        return F.rms_norm(x, self.weight.shape, weight, self.eps)
+        if hasattr(F, "rms_norm"):
+            return F.rms_norm(x, self.weight.shape, weight, self.eps)
+        normed = x * torch.rsqrt(x.float().pow(2).mean(dim=-1, keepdim=True) + self.eps).to(x.dtype)
+        return normed * weight
 
 
 def build_norm(dim: int, norm_type: str) -> nn.Module:

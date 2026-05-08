@@ -1,5 +1,0 @@
-opt,lr,seed,cfg,warmup,train_pattern,train_min1_step,train_min1_loss,train_bump_step,train_bump_loss,train_min2_step,train_min2_loss,train_delta_up,train_delta_down,val_pattern,val_min1_step,val_min1_loss,val_bump_step,val_bump_loss,val_min2_step,val_min2_loss,log
-muscale,1e-3,42,small_125m,1000,0,19320,3.2270,,,,,,,0,20000,3.2305,,,,,sweeps/fineweb_20260429_120914/small_125m-muscale-lr1e-3-seed42.log
-muscale,1e-4,42,small_125m,1000,0,19320,3.3393,,,,,,,0,20000,3.3456,,,,,sweeps/fineweb_20260429_120914/small_125m-muscale-lr1e-4-seed42.log
-muscale,3e-4,42,small_125m,1000,0,19320,3.2559,,,,,,,0,20000,3.2604,,,,,sweeps/fineweb_20260429_120914/small_125m-muscale-lr3e-4-seed42.log
-muscale,5e-4,42,small_125m,1000,0,19320,3.2371,,,,,,,0,20000,3.2413,,,,,sweeps/fineweb_20260429_120914/small_125m-muscale-lr5e-4-seed42.log

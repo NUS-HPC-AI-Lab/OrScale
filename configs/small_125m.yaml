@@ -8,8 +8,8 @@ model:
   tie_weights: true
 
 data:
-  train_pattern: "/home/svu/e0572481/scratch/fineweb10B/fineweb_train_*.bin"
-  val_pattern: "/home/svu/e0572481/scratch/fineweb10B/fineweb_val_*.bin"
+  train_pattern: "data/fineweb10B/fineweb_train_*.bin"
+  val_pattern: "data/fineweb10B/fineweb_val_*.bin"
   streaming: false
 
 training:
@@ -21,7 +21,7 @@ training:
   val_steps: 20
   log_every: 10
   save_every: 5000
-  save_dir: /home/svu/e0572481/scratch/checkpoints/small_125m
+  save_dir: checkpoints/small_125m
   batch_size: 32
   seed: 42
 
@@ -44,5 +44,5 @@ diagnostics:
   heavy_log_every: 500
 
 logging:
-  wandb_project: orscale-fineweb10B
+  wandb_project: null
   wandb_group: small_125m

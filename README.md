@@ -4,6 +4,8 @@
 
 OrScale combines Muon's orthogonalized update direction (Newton-Schulz polar factor) with a redesigned layer-wise trust ratio for update magnitude control. This repository implements the optimizer family and training infrastructure for the OrScale research project.
 
+Public repository: [NUS-HPC-AI-Lab/OrScale](https://github.com/NUS-HPC-AI-Lab/OrScale).
+
 ## Optimizer Variants
 
 Every variant that applies "Moonlight shape normalization" uses the full Moonlight RMS-matching constant `0.2 * sqrt(max(m, n))` (arXiv:2502.16982).
@@ -23,7 +25,7 @@ Additional baselines: **AdamW**, **LAMB**.
 
 The recommended primary variant is **OrScale-Muon-Moonlight-Calibrated**: it shares the "real update direction" denominator `||λW + 0.2·sqrt(max(m,n))·Q||_F` with `OrScale-Muon-Moonlight` and rescales it by a per-layer constant `c_denom_ℓ` auto-calibrated at the first step so that the trust ratio `r̂` is exactly 1 for every layer at initialization. Combined with coupled WD, this gives (i) width-invariance at init (Moonlight-style muP-friendly LR transfer), (ii) LARS-style early-training adaptation `r ≈ ||W_t||_F / ||W_0||_F`, and (iii) a stable asymptotic ceiling `r → 1/(c_denom_ℓ · λ)` that prevents runaway weight-norm growth (the failure mode of an earlier decoupled-WD calibrated formulation).
 
-The two raw-momentum-denominator variants (**MuTrust**, **MuScale**) are formally informative but practically degenerate at typical training conditions — their trust ratios are saturated at `r_max` on essentially every step because `||W||_F / ||M_hat||_F` is `O(1/η_t) ≫ 1`. They are kept as ablations that motivate the calibration. See `documents/OrScale_research_memo.md` and `documents/nips_paper/main.tex` for the full empirical analysis.
+The two raw-momentum-denominator variants (**MuTrust**, **MuScale**) are formally informative but practically degenerate at typical training conditions — their trust ratios are saturated at `r_max` on essentially every step because `||W||_F / ||M_hat||_F` is `O(1/η_t) ≫ 1`. They are kept as ablations that motivate the calibration. Citation details for the associated paper will be added when the public manuscript is available.
 
 Additional experimental variants such as **OrScale-original**, **MuScale-alpha** remain implemented for degeneration tests.
 
@@ -37,10 +39,26 @@ Additional experimental variants such as **OrScale-original**, **MuScale-alpha**
 
 The two Moonlight-shape variants share the looser `[0.1, 5.0]` clip because they have a shape-constant or auto-calibrated denominator. Sweep scripts in `scripts/sweep_*.sh` apply the per-variant defaults automatically; the analytic LAMB convention is `[0, 10]`, tightened here to `[0.1, 5]` because Muon's orthogonalization already controls the update direction.
 
-## Setup
+## Installation
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -e .
+```
+
+Optional extras are split by workflow:
+
+```bash
+# Development and tests
+python -m pip install -e ".[dev]"
+
+# Data prep, vision experiments, downstream eval, analysis, and W&B logging
+python -m pip install -e ".[data,vision,eval,analysis,wandb]"
+```
+
+For the historical all-in-one install path:
+
+```bash
+python -m pip install -r requirements.txt
 ```
 
 ### Data
@@ -54,6 +72,8 @@ python scripts/prepare_data.py --version 10B
 This writes shards to `data/fineweb10B/`. Use `--version 100B` for the larger subset, or `--out <dir>` to change the output location.
 
 Alternatively, the data loader supports HuggingFace datasets as a fallback (slower, downloads on the fly).
+
+The default configs use relative paths such as `data/fineweb10B/` and `checkpoints/`. Override them with `--set data.train_pattern=... data.val_pattern=... training.save_dir=...` for cluster-specific layouts.
 
 ### Vision data (CIFAR-10 / ImageNet)
 
@@ -123,7 +143,7 @@ python scripts/sweep.py --config configs/pilot_25m.yaml \
     --seeds 1 --dry-run
 ```
 
-Sweep runs keep the configured `wandb_group` (for example `pilot_25m`) and now get readable W&B names such as `pilot_25m-muon-lr0.01-seed42`, making optimizer and seed comparisons easy to filter in the dashboard.
+W&B logging is opt-in. Set `logging.wandb_project` in the config or on the command line to enable it; sweep runs keep the configured `wandb_group` and get readable run names such as `pilot_25m-muon-lr0.01-seed42`.
 
 ## Vision experiments (CIFAR-10, ImageNet)
 
@@ -197,6 +217,8 @@ python scripts/run_scaling_law.py --config configs/scaling_law.yaml
 
 This launches a training run for each `(preset, tokens, optimizer)` combination, writes `scaling_law.csv`, and on completion fits the power law and saves `scaling_law.png` + `scaling_law_fits.json`. Approximate Moonlight-sized GPT presets `xs_400m`, `s_550m`, `m_800m`, `l_1_1b`, and `xl_1_5b` are available in `orscale.model.gpt.PRESET_CONFIGS`.
 
+Generated scaling-law outputs are written under `results/` by default and are intentionally ignored by git.
+
 ### Strict Moonlight Table 2 comparison
 
 For the primary optimizer comparison, use the strict config and 8-GPU wrapper:
@@ -232,9 +254,9 @@ ESTIMATE_PFLOPS_PER_SEC=0.65 PRESETS=moonlight_399m,moonlight_545m \
 Useful overrides:
 
 ```bash
-TRAIN_PATTERN="/data/fineweb10B/fineweb_train_*.bin" \
-VAL_PATTERN="/data/fineweb10B/fineweb_val_*.bin" \
-SAVE_DIR="/data/checkpoints/moonlight_scaling" \
+TRAIN_PATTERN="data/fineweb10B/fineweb_train_*.bin" \
+VAL_PATTERN="data/fineweb10B/fineweb_val_*.bin" \
+SAVE_DIR="checkpoints/moonlight_scaling" \
 OPTIMIZER=orscale_muon_moonlight_calibrated \
 bash scripts/run_moonlight_scaling_8gpu.sh
 ```
@@ -245,6 +267,12 @@ bash scripts/run_moonlight_scaling_8gpu.sh
 pytest tests/ -v
 ```
 
+On CPU-only machines without an OpenMP-capable compiler, run tests in eager mode:
+
+```bash
+TORCH_COMPILE_DISABLE=1 pytest tests/ -v
+```
+
 The test suite includes:
 
 - **test_newton_schulz.py** -- Verifies NS5 output matches SVD polar factor, correct Frobenius norms, batched operation.
@@ -253,6 +281,8 @@ The test suite includes:
 - **test_vision_optim.py** -- Muon / OrScale handle 4D Conv2d weights via flatten round-trip, `_split_params` routes conv weights to the matrix group, one step reduces CE on a tiny ConvNet.
 - **test_downstream_eval.py** -- `lm-eval` adapter smoke test on a tiny GPT (`tasks=["hellaswag"], limit=8`).
 - **test_scaling_law.py** -- Power-law fitting recovers the exponent on synthetic `L = 3 * C^-0.05` data.
+- **test_loader.py** -- Lazy `.bin` shard loading and multi-file sample boundaries.
+- **test_gpt_param_routing.py** -- GPT parameter tags route embeddings, norms, heads, and hidden weights to the intended optimizer groups.
 
 ## Project Structure
 
@@ -307,6 +337,8 @@ tests/
   test_vision_optim.py
   test_downstream_eval.py
   test_scaling_law.py
+  test_loader.py
+  test_gpt_param_routing.py
 ```
 
 ## Experiment Configs
@@ -328,3 +360,11 @@ tests/
 4. **Auto-calibration with override**: `OrScale-Muon-Moonlight-Calibrated` auto-calibrates its per-layer denominator constant `c_denom_ℓ = ||W_ℓ(0)||_F / ||λW_ℓ(0) + 0.2·sqrt(max(m,n))·Q_ℓ(0)||_F` at the first optimizer step so that `r̂(0) = 1` exactly. A user-supplied `c_denom` (constant across layers) overrides the auto-calibration; this is useful for ablating the contribution of the calibration itself.
 
 5. **Degeneration tests**: The test suite verifies that MuScale with constant trust ratio degenerates exactly to Muon + Moonlight, ensuring implementation correctness.
+
+## Citation
+
+If you use OrScale in your research, please cite this repository and the associated paper when available. The repository includes `CITATION.cff` so GitHub can surface citation metadata.
+
+## License
+
+OrScale is released under the MIT License. See `LICENSE` for details.

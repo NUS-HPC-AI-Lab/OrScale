@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use OrScale in your research, please cite this software and the associated paper when available."
+title: "OrScale"
+version: "0.1.0"
+date-released: "2026-05-08"
+license: "MIT"
+repository-code: "https://github.com/NUS-HPC-AI-Lab/OrScale"
+authors:
+  - name: "NUS-HPC-AI-Lab"

@@ -57,8 +57,16 @@ def load_bin_shards(pattern: str) -> np.ndarray:
 def _chunk_to_tensors(chunk: np.ndarray) -> tuple[Tensor, Tensor]:
     """Convert a seq_len+1 token chunk to int64 input/target tensors."""
     chunk64 = np.asarray(chunk, dtype=np.int64)
-    x = torch.from_numpy(chunk64[:-1])
-    y = torch.from_numpy(chunk64[1:])
+    try:
+        x = torch.from_numpy(chunk64[:-1])
+        y = torch.from_numpy(chunk64[1:])
+    except RuntimeError as err:
+        if "Numpy is not available" not in str(err):
+            raise
+        # Some PyTorch wheels are built against a different NumPy ABI; lists
+        # avoid torch's NumPy bridge while preserving the same tensor values.
+        x = torch.tensor(chunk64[:-1].tolist(), dtype=torch.long)
+        y = torch.tensor(chunk64[1:].tolist(), dtype=torch.long)
     return x, y
 
 

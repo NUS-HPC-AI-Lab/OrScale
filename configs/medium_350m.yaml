@@ -44,5 +44,5 @@ diagnostics:
   heavy_log_every: 1000
 
 logging:
-  wandb_project: orscale
+  wandb_project: null
   wandb_group: medium_350m

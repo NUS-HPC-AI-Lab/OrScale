@@ -109,7 +109,7 @@ class OrScaleOptimizer(Optimizer):
                 tight clip was set on 2026-04-22 after the ``fineweb_bump``
                 investigation showed that the original ``[0.1, 10.0]``
                 bounds let some variants run at ~10x the nominal LR during
-                warmup; see ``reports/fineweb_bump/`` and the sweep memo.
+                warmup; see the FineWeb bump-sweep notes in the paper artifacts.
                 The clip is the only thing keeping ``mutrust`` / ``muscale``
                 from running at runaway effective LR (their raw ratio is
                 ``O(1/lr)`` in practice; they saturate at ``r_max`` on
