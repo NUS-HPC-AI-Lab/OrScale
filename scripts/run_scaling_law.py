@@ -29,7 +29,7 @@ Config schema (see configs/scaling_law.yaml for a worked example):
     optimizers:
       - name: adamw
         lr: 3.0e-4
-      - name: muscale_alpha
+      - name: orscale_lm
         lr: 0.02
     seeds: 1
     launcher:
@@ -123,7 +123,7 @@ def resolve_optimizer_lr(preset: dict, optimizer: dict) -> float | None:
     Precedence (highest to lowest):
       1. ``preset["optimizer_lrs"][optimizer_name]`` -- per-preset, per-optimizer
          override. Used by strict scaling configs to give a different matrix LR
-         to one optimizer (e.g. uncalibrated ``orscale_muon_moonlight``) without
+         to one optimizer without
          changing the shared per-preset LR used by every other optimizer.
       2. ``optimizer["lr"]`` -- a single LR for this optimizer across presets.
       3. ``preset["lr"]`` -- the default per-preset LR shared across optimizers.
@@ -150,8 +150,7 @@ def resolve_optimizer_value(value, *, lr: float | None, preset_lr: float | None 
       - ``"same_as_preset_lr"`` -> the shared ``preset["lr"]`` *before* any
         per-optimizer override. Use this when an inner sub-optimizer should
         stay anchored to the preset LR even though the matrix LR was bumped
-        for one optimizer (e.g. ``adamw_lr`` for the AdamW group of an
-        ``orscale_muon_moonlight`` cell that runs its matrix LR at 3x preset).
+        for one optimizer.
     """
     if isinstance(value, str):
         if value == "same_as_lr":

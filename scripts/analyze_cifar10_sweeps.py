@@ -282,9 +282,41 @@ OPT_COLORS: Dict[str, str] = {
 }
 OPT_ORDER: List[str] = list(OPT_COLORS.keys())
 
+# Paper-aligned display names. The internal sweep tags above are kept stable
+# so old log filenames continue to parse, but every legend / axis / table /
+# report uses the human-readable label below. Keep this dict in sync with the
+# variants used in the public OrScale optimizer comparison.
+DISPLAY_NAMES: Dict[str, str] = {
+    "muon":                              "Muon",
+    "muon_moonlight":                    "Muon+Moonlight",
+    "orscale_muon_wd":                   "OrScale",
+    "orscale_muon_moonlight_calibrated": "OrScale-LM",
+    "orscale_muon":                      "OrScale-FM1 (degenerate)",
+    "orscale_muon_moonlight":            "OrScale+Moonlight (no calibration)",
+    "mutrust":                           "MuTrust (FM2)",
+    "muscale":                           "MuScale (FM2)",
+    "adamw":                             "AdamW",
+    "lamb":                              "LAMB",
+}
+
+# The five baselines featured in the main-paper CIFAR-10 / DavidNet
+# leaderboard (paper Section 7.2). The remaining four optimizers stay in the
+# full-sweep figure used in the appendix.
+DEFAULT_MAIN_BASELINES: List[str] = [
+    "muon",
+    "muon_moonlight",
+    "orscale_muon_wd",
+    "adamw",
+    "lamb",
+]
+
 
 def opt_color(opt: str) -> str:
     return OPT_COLORS.get(opt, "#555555")
+
+
+def display_name(opt: str) -> str:
+    return DISPLAY_NAMES.get(opt, opt)
 
 
 def per_epoch_matrix(runs: List[RunLog], field_name: str, max_epochs: int) -> np.ndarray:
@@ -304,14 +336,18 @@ def plot_curves(
     out_path: Path,
     title: str,
     invert_better: bool = False,
+    include: Optional[Iterable[str]] = None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(9, 5.5))
     max_epochs = max(
         (r.total_epochs for _, runs in runs_by_opt_best_lr.values() for r in runs),
         default=24,
     )
+    allowed = set(include) if include is not None else None
     for opt in OPT_ORDER:
         if opt not in runs_by_opt_best_lr:
+            continue
+        if allowed is not None and opt not in allowed:
             continue
         lr, runs = runs_by_opt_best_lr[opt]
         mat = per_epoch_matrix(runs, field_name, max_epochs)
@@ -319,7 +355,7 @@ def plot_curves(
         std = np.nanstd(mat, axis=0, ddof=1) if mat.shape[0] > 1 else np.zeros_like(mean)
         x = np.arange(max_epochs)
         color = opt_color(opt)
-        label = f"{opt} (lr={lr:g})"
+        label = f"{display_name(opt)} (lr={lr:g})"
         ax.plot(x, mean, color=color, label=label, linewidth=2)
         ax.fill_between(x, mean - std, mean + std, color=color, alpha=0.18, linewidth=0)
     ax.set_xlabel("Epoch")
@@ -339,10 +375,14 @@ def plot_train_loss(
     runs_by_opt_best_lr: Dict[str, Tuple[float, List[RunLog]]],
     out_path: Path,
     smooth: int = 5,
+    include: Optional[Iterable[str]] = None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(9, 5.5))
+    allowed = set(include) if include is not None else None
     for opt in OPT_ORDER:
         if opt not in runs_by_opt_best_lr:
+            continue
+        if allowed is not None and opt not in allowed:
             continue
         lr, runs = runs_by_opt_best_lr[opt]
         # concatenate per-step (step, loss) for each run, then average by interp onto a common grid
@@ -360,7 +400,7 @@ def plot_train_loss(
             mean = np.convolve(mean, k, mode="same")
             std = np.convolve(std, k, mode="same")
         color = opt_color(opt)
-        ax.plot(steps, mean, color=color, label=f"{opt} (lr={lr:g})", linewidth=1.8)
+        ax.plot(steps, mean, color=color, label=f"{display_name(opt)} (lr={lr:g})", linewidth=1.8)
         ax.fill_between(steps, mean - std, mean + std, color=color, alpha=0.15, linewidth=0)
     ax.set_xlabel("Train step")
     ax.set_ylabel("Train loss (smoothed)")
@@ -378,13 +418,17 @@ def plot_lr_sensitivity(
     summary_opt_lr: List[dict],
     headline_label: str,
     out_path: Path,
+    include: Optional[Iterable[str]] = None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(8.5, 5.5))
     grouped: Dict[str, List[dict]] = defaultdict(list)
     for row in summary_opt_lr:
         grouped[row["optimizer"]].append(row)
+    allowed = set(include) if include is not None else None
     for opt in OPT_ORDER:
         if opt not in grouped:
+            continue
+        if allowed is not None and opt not in allowed:
             continue
         rows = sorted(grouped[opt], key=lambda r: r["lr"])
         lrs = [r["lr"] for r in rows]
@@ -398,7 +442,7 @@ def plot_lr_sensitivity(
             linewidth=1.8,
             capsize=3,
             color=opt_color(opt),
-            label=opt,
+            label=display_name(opt),
         )
     ax.set_xscale("log")
     ax.set_xlabel("Learning rate (log scale)")
@@ -416,13 +460,19 @@ def plot_variance_best_lr(
     best_lr_runs: Dict[str, Tuple[float, List[RunLog]]],
     headline: str,
     out_path: Path,
+    include: Optional[Iterable[str]] = None,
 ) -> None:
     fig, ax = plt.subplots(figsize=(9, 5.5))
     xs: List[float] = []
     labels: List[str] = []
     all_vals: List[float] = []
     per_opt_vals: List[Tuple[int, List[float]]] = []
-    for i, opt in enumerate([o for o in OPT_ORDER if o in best_lr_runs]):
+    allowed = set(include) if include is not None else None
+    visible_opts = [
+        o for o in OPT_ORDER
+        if o in best_lr_runs and (allowed is None or o in allowed)
+    ]
+    for i, opt in enumerate(visible_opts):
         lr, runs = best_lr_runs[opt]
         vals = [run_headline(r, headline) for r in runs]
         per_opt_vals.append((i, vals))
@@ -435,7 +485,7 @@ def plot_variance_best_lr(
             capsize=4, ecolor="#333333",
         )
         xs.append(i)
-        labels.append(f"{opt}\nlr={lr:g}")
+        labels.append(f"{display_name(opt)}\nlr={lr:g}")
 
     for i, vals in per_opt_vals:
         ax.scatter(
@@ -480,7 +530,7 @@ def plot_wallclock(runs: List[RunLog], out_path: Path) -> None:
         std = float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0
         ax.bar(i, mean, yerr=std, color=opt_color(opt), alpha=0.75, capsize=4, width=0.6)
         xs.append(i)
-        labels.append(opt)
+        labels.append(display_name(opt))
     ax.set_xticks(xs)
     ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=9)
     ax.set_ylabel("Wall-clock per run (s)")
@@ -626,7 +676,7 @@ def write_summary_markdown(summary: List[dict], out_path: Path, headline_label: 
     for r in summary:
         rows.append(
             [
-                r["optimizer"],
+                display_name(r["optimizer"]),
                 f"{r['lr']:g}",
                 str(r["n_seeds"]),
                 f"{fmt_pct(r['headline_mean'])} ± {fmt_pct(r['headline_std'])}",
@@ -655,7 +705,7 @@ def write_best_lr_markdown(best_lr: Dict[str, dict], out_path: Path, headline_la
         rows.append(
             [
                 str(i),
-                r["optimizer"],
+                display_name(r["optimizer"]),
                 f"{r['lr']:g}",
                 str(r["n_seeds"]),
                 f"{fmt_pct(r['headline_mean'])} ± {fmt_pct(r['headline_std'])}",
@@ -702,7 +752,8 @@ def write_report(
     sorted_rows = sorted(best_lr.values(), key=lambda r: -r["headline_mean"])
     for i, r in enumerate(sorted_rows, 1):
         lines.append(
-            f"{i}. **{r['optimizer']}** @ lr={r['lr']:g} — "
+            f"{i}. **{display_name(r['optimizer'])}** "
+            f"(`{r['optimizer']}`) @ lr={r['lr']:g} — "
             f"{fmt_pct(r['headline_mean'])}% ± {fmt_pct(r['headline_std'])} "
             f"(final: {fmt_pct(r['final_mean'])}%, best-ever: {fmt_pct(r['best_mean'])}%)"
         )
@@ -710,7 +761,8 @@ def write_report(
     if sorted_rows:
         top = sorted_rows[0]
         lines.append(
-            f"**Winner:** `{top['optimizer']}` at lr={top['lr']:g} with "
+            f"**Winner:** {display_name(top['optimizer'])} (`{top['optimizer']}`) "
+            f"at lr={top['lr']:g} with "
             f"{fmt_pct(top['headline_mean'])}% val_top1 ({headline_label}), "
             f"averaged over {top['n_seeds']} seeds."
         )
@@ -756,6 +808,154 @@ def write_report(
     (out_dir / "report.md").write_text("\n".join(lines) + "\n")
 
 
+def _read_summary_csv(path: Path) -> List[dict]:
+    rows: List[dict] = []
+    with path.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for raw in reader:
+            row: dict = {}
+            for k, v in raw.items():
+                if k in {"optimizer"}:
+                    row[k] = v
+                elif k == "n_seeds":
+                    row[k] = int(v) if v else 0
+                else:
+                    row[k] = float(v) if v not in ("", None) else math.nan
+            rows.append(row)
+    return rows
+
+
+def _read_runs_csv(path: Path, headline: str) -> List[dict]:
+    """Read the per-run CSV and project per-(opt, lr, seed) headlines."""
+    rows: List[dict] = []
+    field_map = {
+        "last3": "last3_val_top1",
+        "final": "final_val_top1",
+        "best": "best_val_top1",
+    }
+    field = field_map[headline]
+    with path.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for raw in reader:
+            try:
+                rows.append(
+                    {
+                        "optimizer": raw["optimizer"],
+                        "lr": float(raw["lr"]),
+                        "seed": int(raw["seed"]),
+                        "headline": float(raw[field]) if raw[field] else math.nan,
+                    }
+                )
+            except (KeyError, ValueError):
+                continue
+    return rows
+
+
+def regenerate_from_csv(out_dir: Path, headline: str, headline_label: str, main_baselines: List[str]) -> None:
+    """Regenerate the plots that depend only on existing tidy CSVs.
+
+    Used when raw sweep logs are no longer available locally (e.g. they
+    lived on a remote training machine) but the analyzed CSVs and report
+    have already been written into ``out_dir``. This path regenerates the
+    LR-sensitivity figure and the per-seed variance bar chart -- the two
+    plots that the main paper actually cites -- in both the full and
+    main-only variants. The per-epoch curves are skipped because they
+    require ``steps.csv`` columns that are not part of the headline.
+    """
+    summary_csv = out_dir / "summary_by_opt_lr.csv"
+    runs_csv = out_dir / "runs.csv"
+    if not summary_csv.exists():
+        raise SystemExit(f"missing {summary_csv}; cannot regenerate from CSV")
+
+    summary = _read_summary_csv(summary_csv)
+
+    plots_dir = out_dir / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    for ext in ("png", "pdf"):
+        plot_lr_sensitivity(summary, headline_label, plots_dir / f"lr_sensitivity_val_top1.{ext}")
+        if main_baselines:
+            plot_lr_sensitivity(
+                summary,
+                headline_label,
+                plots_dir / f"lr_sensitivity_val_top1_main.{ext}",
+                include=main_baselines,
+            )
+
+    if not runs_csv.exists():
+        return
+    per_run = _read_runs_csv(runs_csv, headline)
+    by_opt_lr: Dict[Tuple[str, float], List[float]] = defaultdict(list)
+    for row in per_run:
+        by_opt_lr[(row["optimizer"], row["lr"])].append(row["headline"])
+
+    best_lr: Dict[str, Tuple[float, List[float]]] = {}
+    for s in summary:
+        opt = s["optimizer"]
+        if math.isnan(s["headline_mean"]):
+            continue
+        cur = best_lr.get(opt)
+        if cur is None or s["headline_mean"] > best_lr_summary_mean(summary, opt, cur[0]):
+            best_lr[opt] = (s["lr"], by_opt_lr.get((opt, s["lr"]), []))
+
+    def _bar_plot(out_path: Path, include: Optional[Iterable[str]]) -> None:
+        fig, ax = plt.subplots(figsize=(9, 5.5))
+        allowed = set(include) if include is not None else None
+        visible = [
+            o for o in OPT_ORDER
+            if o in best_lr and (allowed is None or o in allowed)
+        ]
+        all_vals: List[float] = []
+        for i, opt in enumerate(visible):
+            lr, vals = best_lr[opt]
+            vals_clean = [v for v in vals if not math.isnan(v)]
+            if not vals_clean:
+                continue
+            all_vals.extend(vals_clean)
+            mean = float(np.mean(vals_clean))
+            std = float(np.std(vals_clean, ddof=1)) if len(vals_clean) > 1 else 0.0
+            ax.bar(
+                i, mean, yerr=std,
+                color=opt_color(opt), alpha=0.7, width=0.6,
+                capsize=4, ecolor="#333333",
+            )
+            ax.scatter(
+                [i] * len(vals_clean), vals_clean,
+                color="black", s=36, zorder=3,
+                edgecolors="white", linewidths=0.5,
+            )
+        if all_vals:
+            lo, hi = min(all_vals), max(all_vals)
+            pad = max(0.5, (hi - lo) * 0.25)
+            ax.set_ylim(lo - pad, hi + pad)
+        ax.set_xticks(range(len(visible)))
+        ax.set_xticklabels(
+            [f"{display_name(o)}\nlr={best_lr[o][0]:g}" for o in visible],
+            rotation=30, ha="right", fontsize=9,
+        )
+        ax.set_ylabel(f"Val top-1 (%) — {headline}")
+        ax.set_title("Per-seed val_top1 at best LR (bars = mean ± std, dots = individual seeds)")
+        ax.grid(True, axis="y", alpha=0.3)
+        fig.tight_layout()
+        fig.savefig(out_path, dpi=140)
+        plt.close(fig)
+
+    for ext in ("png", "pdf"):
+        _bar_plot(plots_dir / f"variance_best_lr_val_top1.{ext}", include=None)
+        if main_baselines:
+            _bar_plot(
+                plots_dir / f"variance_best_lr_val_top1_main.{ext}",
+                include=main_baselines,
+            )
+
+
+def best_lr_summary_mean(summary: List[dict], opt: str, lr: float) -> float:
+    for row in summary:
+        if row["optimizer"] == opt and abs(row["lr"] - lr) < 1e-12:
+            return row["headline_mean"]
+    return float("-inf")
+
+
 def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
     ap = argparse.ArgumentParser(description=__doc__)
@@ -775,6 +975,15 @@ def main() -> None:
         ),
     )
     ap.add_argument(
+        "--from-reports",
+        action="store_true",
+        help=(
+            "Regenerate plots from existing reports CSVs (summary_by_opt_lr.csv, "
+            "runs.csv) instead of parsing raw sweep logs. Use this when raw "
+            "logs are not available locally but the analyzed report directory is."
+        ),
+    )
+    ap.add_argument(
         "--out-dir",
         type=Path,
         default=repo_root / "reports" / "cifar10_davidnet",
@@ -791,6 +1000,17 @@ def main() -> None:
         action="store_true",
         help="Skip writing steps.csv (it can get large).",
     )
+    ap.add_argument(
+        "--main-baselines",
+        type=str,
+        default=",".join(DEFAULT_MAIN_BASELINES),
+        help=(
+            "Comma-separated list of internal optimizer tags to include in "
+            "the main-paper companion plots (`*_main.png` / `*_main.pdf`). "
+            "Pass an empty string to skip the main-only variants. Default: "
+            + ",".join(DEFAULT_MAIN_BASELINES)
+        ),
+    )
     args = ap.parse_args()
 
     sweeps_dirs: List[Path] = (
@@ -804,10 +1024,21 @@ def main() -> None:
         "best": "best observed",
     }[headline]
 
+    main_baselines: List[str] = [
+        b.strip() for b in args.main_baselines.split(",") if b.strip()
+    ]
+
+    if args.from_reports:
+        print(f"[info] Regenerating plots from CSVs under {out_dir}...")
+        regenerate_from_csv(out_dir, headline, headline_label, main_baselines)
+        print(f"[done] Updated plots in {out_dir / 'plots'}")
+        return
+
     missing = [d for d in sweeps_dirs if not d.exists()]
     if missing:
         raise SystemExit(
             "sweeps dir(s) not found: " + ", ".join(str(d) for d in missing)
+            + ". Pass --from-reports to regenerate plots from existing CSVs."
         )
 
     print(f"[info] Scanning sweeps: {', '.join(str(d) for d in sweeps_dirs)}")
@@ -911,6 +1142,48 @@ def main() -> None:
     plot_variance_best_lr(best_lr_runs, headline, out_dir / "plots" / "variance_best_lr_val_top1.png")
     plot_wallclock(runs, out_dir / "plots" / "wallclock_seconds.png")
 
+    if main_baselines:
+        unknown = [b for b in main_baselines if b not in OPT_ORDER]
+        if unknown:
+            print(
+                f"[warn] --main-baselines contains unknown tags: {unknown}; "
+                f"valid choices are {OPT_ORDER}"
+            )
+        print(
+            f"[info] Generating main-paper companion plots for {main_baselines}..."
+        )
+        # Emit both .png (for fast inspection) and .pdf (for LaTeX inclusion)
+        # for the four panels that appear in the main-paper draft.
+        for ext in ("png", "pdf"):
+            plot_curves(
+                best_lr_runs,
+                field_name="val_top1",
+                ylabel="Val top-1 (%)",
+                out_path=out_dir / "plots" / f"curves_val_top1_main.{ext}",
+                title="Val top-1 — main-paper baselines (mean ± std over seeds)",
+                include=main_baselines,
+            )
+            plot_curves(
+                best_lr_runs,
+                field_name="val_loss",
+                ylabel="Val loss",
+                out_path=out_dir / "plots" / f"curves_val_loss_main.{ext}",
+                title="Val loss — main-paper baselines (mean ± std over seeds)",
+                include=main_baselines,
+            )
+            plot_lr_sensitivity(
+                summary_opt_lr,
+                headline_label,
+                out_dir / "plots" / f"lr_sensitivity_val_top1_main.{ext}",
+                include=main_baselines,
+            )
+            plot_variance_best_lr(
+                best_lr_runs,
+                headline,
+                out_dir / "plots" / f"variance_best_lr_val_top1_main.{ext}",
+                include=main_baselines,
+            )
+
     print("[info] Writing report.md...")
     write_report(out_dir, headline_label, runs, summary_opt_lr, best_lr_map)
 
@@ -920,8 +1193,9 @@ def main() -> None:
     print(f" Ranking by val_top1 ({headline_label}) at best LR:")
     print("=" * 72)
     for i, row in enumerate(sorted(best_lr_map.values(), key=lambda r: -r["headline_mean"]), 1):
+        label = f"{display_name(row['optimizer'])} ({row['optimizer']})"
         print(
-            f"  {i}. {row['optimizer']:<28s} lr={row['lr']:<6g}  "
+            f"  {i}. {label:<60s} lr={row['lr']:<6g}  "
             f"{row['headline_mean']:.2f}% ± {row['headline_std']:.2f}  "
             f"(n={row['n_seeds']}, wallclock≈{row['wallclock_mean_s']:.1f}s)"
         )

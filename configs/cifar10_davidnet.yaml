@@ -2,7 +2,7 @@
 #
 # Reference global batch size 512. Use `--set` or a multi-node launcher to
 # scale. DavidNet ~6.5M params, 24 epochs ~= 94 val acc on a single GPU with
-# AdamW; Muon / MuScale-alpha are the focus of this sweep.
+# AdamW, Muon, and OrScale are the focus of this sweep.
 
 task: vision
 
@@ -29,11 +29,10 @@ training:
   label_smoothing: 0.0
 
 optimizer:
-  name: muscale_alpha
+  name: orscale
   lr: 0.02
   momentum: 0.95
   weight_decay: 5.0e-4
-  alpha: 0.5
   r_min: 0.5
   r_max: 1.5
   eps: 1.0e-6

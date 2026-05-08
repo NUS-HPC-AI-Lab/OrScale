@@ -8,8 +8,8 @@
 #
 # Optimizers       : 8 Muon-family + AdamW + LAMB
 # Per-family LR    : Muon family {0.005, 0.01, 0.02, 0.04} for seven variants
-#                    (muon, muon_moonlight, orscale_muon, orscale_muon_wd,
-#                    orscale_muon_moonlight, orscale_muon_moonlight_calibrated,
+#                    (muon, muon_moonlight, orscale_muon, orscale,
+#                    orscale_muon_moonlight, orscale_lm,
 #                    mutrust)
 #                    muscale       {0.04, 0.06, 0.08, 0.12} (follow-up grid;
 #                    override with MUSCALE_LRS=...)
@@ -17,7 +17,7 @@
 # Per-variant trust-ratio clip:
 #                    Default (YAML)                       r_min=0.5, r_max=1.5
 #                    orscale_muon_moonlight             → r_min=0.1, r_max=5.0
-#                    orscale_muon_moonlight_calibrated  → r_min=0.1, r_max=5.0
+#                    orscale_lm                        → r_min=0.1, r_max=5.0
 #                    (Moonlight-shape variants get LARS/LAMB-style looser
 #                    bounds: the calibrated denominator is auto-set so
 #                    r̂(0)=1 per layer; the original Moonlight variant's
@@ -31,7 +31,7 @@
 # 0.2*sqrt(max(m,n)) on the orthogonalized update Q. It is the
 # (dynamic-denominator, shape-scaled) corner of the 2x2 design space
 # spanned by trust-ratio denominator x shape factor, and is the
-# recommended primary OrScale variant in the paper.
+# retained here as a legacy ablation.
 #
 # Why the Moonlight-scaled variants (muon_moonlight, orscale_muon_moonlight)
 # stay on the Muon grid here, unlike sweep_fineweb_small.sh
@@ -100,9 +100,9 @@ declare -a JOBS=(
   "muon                                ${MUON_LRS}"
   "muon_moonlight                      ${MUON_LRS}"
   "orscale_muon                        ${MUON_LRS}"
-  "orscale_muon_wd                     ${MUON_LRS}"
+  "orscale                             ${MUON_LRS}"
   "orscale_muon_moonlight              ${MUON_LRS}"
-  "orscale_muon_moonlight_calibrated   ${MUON_LRS}"
+  "orscale_lm                          ${MUON_LRS}"
   "mutrust                             ${MUON_LRS}"
   "muscale                             ${MUSCALE_LRS}"
   "adamw                               ${ADAM_LRS}"
@@ -114,11 +114,11 @@ declare -a JOBS=(
 #  - orscale_muon_moonlight: shape-constant denominator gives a wider
 #    natural trust-ratio range; the tight default fires r_min~16% of
 #    steps at the optimal LR on FineWeb.
-#  - orscale_muon_moonlight_calibrated: auto-calibrated denominator sets
+#  - orscale_lm: auto-calibrated denominator sets
 #    r̂(0)=1 per layer, so the natural operating range is wider still.
 extra_set_for_opt() {
   case "$1" in
-    orscale_muon_moonlight | orscale_muon_moonlight_calibrated)
+    orscale_muon_moonlight | orscale_lm)
       echo "optimizer.r_min=0.1 optimizer.r_max=5.0"
       ;;
     *)
@@ -144,7 +144,7 @@ if [[ -n "$OPTIMIZERS" ]]; then
     done
     if [[ "$found" -eq 0 ]]; then
       echo "[error] unknown optimizer in OPTIMIZERS: $requested_opt" >&2
-      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight orscale_muon_moonlight_calibrated mutrust muscale adamw lamb" >&2
+      echo "        valid choices: muon muon_moonlight orscale_muon orscale orscale_muon_moonlight orscale_lm mutrust muscale adamw lamb" >&2
       exit 1
     fi
   done

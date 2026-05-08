@@ -37,13 +37,12 @@ training:
 optimizer:
   # LAMB-style sqrt LR scaling: start from base_lr at base_batch=512 then
   # scale to global batch. For LAMB/Muon at 16K, LAMB paper uses ~0.01.
-  name: muscale_alpha
+  name: orscale
   lr: 0.002                  # base (at batch 512) -> sqrt(16384/512)=5.66x -> ~0.0113
   sqrt_lr_scaling: true
   sqrt_lr_scaling_base_batch: 512
   momentum: 0.95
   weight_decay: 1.0e-4
-  alpha: 0.5
   r_min: 0.5
   r_max: 1.5
   eps: 1.0e-6

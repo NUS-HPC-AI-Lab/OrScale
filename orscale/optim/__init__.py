@@ -14,12 +14,17 @@ from torch import nn
 
 from orscale.optim.lamb import LAMB
 from orscale.optim.muon import Muon
-from orscale.optim.orscale_optimizer import OrScaleOptimizer, OrScaleVariant
+from orscale.optim.orscale_optimizer import (
+    OrScaleOptimizer,
+    OrScaleVariant,
+    normalize_orscale_variant,
+)
 
 __all__ = [
     "Muon",
     "OrScaleOptimizer",
     "OrScaleVariant",
+    "normalize_orscale_variant",
     "LAMB",
     "build_optimizer",
 ]
@@ -28,6 +33,9 @@ __all__ = [
 _MUON_FAMILY = {
     "muon",
     "muon_moonlight",
+    "orscale",
+    "orscale-lm",
+    "orscale_lm",
     "orscale_original",
     "orscale_muon",
     "orscale_muon_wd",
@@ -95,6 +103,7 @@ def build_optimizer(
 
     Args:
         name: Optimizer name. One of 'adamw', 'lamb', 'muon', 'muon_moonlight',
+              'orscale', 'orscale_lm', or a legacy ablation name such as
               'orscale_original', 'orscale_muon', 'orscale_muon_wd',
               'orscale_muon_moonlight', 'orscale_muon_moonlight_calibrated',
               'mutrust', 'muscale', 'muscale_alpha'.
@@ -175,8 +184,12 @@ def build_optimizer(
             ns_iters=config.get("ns_iters", 5),
         )
     else:
-        # OrScale variants
-        variant = name if name in {
+        # OrScale variants. Normalize paper-facing names and legacy aliases to
+        # the canonical enum before constructing the optimizer.
+        variant = normalize_orscale_variant(name if name in {
+            "orscale",
+            "orscale-lm",
+            "orscale_lm",
             "orscale_original",
             "orscale_muon",
             "orscale_muon_wd",
@@ -185,7 +198,7 @@ def build_optimizer(
             "mutrust",
             "muscale",
             "muscale_alpha",
-        } else config.get("variant", name)
+        } else config.get("variant", name))
         matrix_opt = OrScaleOptimizer(
             matrix_params,
             lr=config.get("lr", 0.02),

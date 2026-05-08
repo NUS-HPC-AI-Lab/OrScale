@@ -1,37 +1,24 @@
 """
 OrScale optimizer family: Orthogonalized updates with layer-wise trust-ratio scaling.
 
-Combines Muon's orthogonalized update direction with several layer-wise trust
-ratio designs in a single configurable class. Eight variants are implemented:
+Combines Muon's orthogonalized update direction with layer-wise trust-ratio
+scaling in a single configurable class. The paper-facing variants are:
 
-    OrScale-original                  : EMA momentum,  ||Q||_F denominator
-    OrScale-Muon                      : Nesterov,      ||Q||_F denominator
-    OrScale-Muon-WD                   : Nesterov,      ||λW + Q||_F denominator,
-                                                       coupled WD update
-    OrScale-Muon-Moonlight            : Nesterov,      ||λW + 0.2·√max(m,n)·Q||_F
-                                                       denominator, 0.2·√max(m,n)
-                                                       shape norm, coupled WD update
-    OrScale-Muon-Moonlight-Calibrated : Nesterov,      c_denom_ℓ·||λW + 0.2·√max(m,n)·Q||_F
-                                                       denominator (c_denom_ℓ
-                                                       auto-calibrated per-layer
-                                                       at step 0 so r̂_ℓ(0)=1),
-                                                       0.2·√max(m,n) shape norm,
-                                                       coupled WD update
-    MuTrust                           : Nesterov,      ||M_hat||_F denominator
-    MuScale                           : Nesterov,      RMS(M_hat) denominator,
-                                                       0.2·√max(m,n) shape norm
-    MuScale-alpha                     : Nesterov,      RMS(M_hat) denominator,
-                                                       0.2·√max(m,n) shape norm,
-                                                       partial exponent
+    OrScale    : Nesterov, ||λW + Q||_F denominator, coupled WD update
+    OrScale-LM : Nesterov, c_denom_ℓ·||λW + 0.2·√max(m,n)·Q||_F denominator,
+                 0.2·√max(m,n) shape norm, coupled WD update
+
+Additional legacy / ablation names remain accepted for reproducing older
+experiments and tests.
 
 All variants that apply Moonlight shape normalization use the full Moonlight
 RMS-matching constant ``0.2·sqrt(max(m, n))`` (see ``MOONLIGHT_RMS_CONSTANT``).
 
-The ``calibrated`` variant is a per-layer calibrated extension of
-``orscale_muon_moonlight``: it shares the same "real update direction"
-denominator ``||λW + 0.2·√max(m,n)·Q||_F`` and the same coupled-WD update,
-but rescales the denominator by a per-layer constant ``c_denom_ℓ`` that
-anchors the trust ratio so ``r̂_ℓ(0) = 1`` for every layer.  By default
+The ``orscale_lm`` variant is a per-layer calibrated extension of Moonlight
+Muon: it uses the "real update direction" denominator
+``||λW + 0.2·√max(m,n)·Q||_F`` and the coupled-WD update, but rescales the
+denominator by a per-layer constant ``c_denom_ℓ`` that anchors the trust ratio
+so ``r̂_ℓ(0) = 1`` for every layer.  By default
 ``c_denom_ℓ`` is set per layer at step 0 from
 ``||W_ℓ(0)||_F / ||λW_ℓ(0) + 0.2·√max(m,n)·Q_ℓ(0)||_F``, which (i) makes the
 trust ratio land at exactly 1 at initialization regardless of init scheme or
@@ -44,7 +31,7 @@ ceiling (the runaway feedback loop that broke the previous
 which scales the WD pull-back together with the Q step so ``r`` cannot drive
 unbounded weight growth).
 
-See the OrScale research memo for the full derivation and motivation.
+See the OrScale paper for the full derivation and motivation.
 """
 
 from __future__ import annotations
@@ -62,6 +49,8 @@ from orscale.optim.newton_schulz import orthogonalize
 
 
 class OrScaleVariant(str, Enum):
+    ORSCALE = "orscale"
+    ORSCALE_LM = "orscale_lm"
     ORSCALE_ORIGINAL = "orscale_original"
     ORSCALE_MUON = "orscale_muon"
     ORSCALE_MUON_WD = "orscale_muon_wd"
@@ -70,6 +59,26 @@ class OrScaleVariant(str, Enum):
     MUTRUST = "mutrust"
     MUSCALE = "muscale"
     MUSCALE_ALPHA = "muscale_alpha"
+
+
+_VARIANT_ALIASES = {
+    # Paper-facing names.
+    "orscale": OrScaleVariant.ORSCALE,
+    "orscale-lm": OrScaleVariant.ORSCALE_LM,
+    "orscale_lm": OrScaleVariant.ORSCALE_LM,
+    # Backward-compatible names used by older configs and sweep artifacts.
+    "orscale_muon_wd": OrScaleVariant.ORSCALE,
+    "orscale_muon_moonlight_calibrated": OrScaleVariant.ORSCALE_LM,
+}
+
+
+def normalize_orscale_variant(variant: str | OrScaleVariant) -> OrScaleVariant:
+    """Return the canonical paper-aligned OrScale variant enum."""
+    raw = variant.value if isinstance(variant, OrScaleVariant) else str(variant)
+    name = raw.lower().strip()
+    if name in _VARIANT_ALIASES:
+        return _VARIANT_ALIASES[name]
+    return OrScaleVariant(name)
 
 
 class OrScaleOptimizer(Optimizer):
@@ -96,15 +105,17 @@ class OrScaleOptimizer(Optimizer):
         lr: Learning rate (default: 0.02).
         momentum: Momentum coefficient (default: 0.95).
         weight_decay: Decoupled weight decay (default: 0.0).
-        variant: One of 'orscale_original', 'orscale_muon', 'orscale_muon_wd',
-            'orscale_muon_moonlight', 'orscale_muon_moonlight_calibrated',
-            'mutrust', 'muscale', 'muscale_alpha'.
+        variant: One of 'orscale' (paper OrScale), 'orscale_lm' (paper
+            OrScale-LM), or a legacy ablation name such as 'orscale_original',
+            'orscale_muon', 'orscale_muon_moonlight', 'mutrust', 'muscale',
+            or 'muscale_alpha'. Legacy aliases 'orscale_muon_wd' and
+            'orscale_muon_moonlight_calibrated' are still accepted.
         alpha: Trust ratio exponent. Only used for muscale_alpha (default: 0.5).
         r_min: Lower clipping bound for trust ratio (default: 0.5).  The
             recommended per-variant bounds are:
 
               * ``[0.5, 1.5]`` for the *non-Moonlight* variants
-                (``orscale_muon``, ``orscale_muon_wd``, ``mutrust``,
+                (``orscale``, ``orscale_muon``, ``mutrust``,
                 ``muscale``, ``muscale_alpha``, ``orscale_original``).  This
                 tight clip was set on 2026-04-22 after the ``fineweb_bump``
                 investigation showed that the original ``[0.1, 10.0]``
@@ -116,8 +127,7 @@ class OrScaleOptimizer(Optimizer):
                 ~100% of steps regardless of the chosen ``r_max``).
 
               * ``[0.1, 5.0]`` for the *Moonlight-shape* variants
-                (``orscale_muon_moonlight``,
-                ``orscale_muon_moonlight_calibrated``).  These have a
+                (``orscale_muon_moonlight``, ``orscale_lm``).  These have a
                 shape-constant or auto-calibrated denominator with a wider
                 natural operating range, and benefit from LARS/LAMB-style
                 looser bounds.  The calibrated variant is auto-set so that
@@ -136,7 +146,7 @@ class OrScaleOptimizer(Optimizer):
         eps: Numerical stability constant (default: 1e-6).
         ns_iters: Number of Newton-Schulz iterations (default: 5).
         c_denom: Per-layer reference scale used in the denominator of the
-            ``orscale_muon_moonlight_calibrated`` variant only.  If ``None``
+            ``orscale_lm`` variant only.  If ``None``
             (default), each layer's ``c_denom_ℓ`` is auto-calibrated at the
             first step from
             ``||W_ℓ(0)||_F / ||λW_ℓ(0) + 0.2·√max(m,n)·Q_ℓ(0)||_F``, which
@@ -152,7 +162,7 @@ class OrScaleOptimizer(Optimizer):
         lr: float = 0.02,
         momentum: float = 0.95,
         weight_decay: float = 0.0,
-        variant: str = "muscale_alpha",
+        variant: str = "orscale_lm",
         alpha: float = 0.5,
         r_min: float = 0.5,
         r_max: float = 1.5,
@@ -167,7 +177,7 @@ class OrScaleOptimizer(Optimizer):
         if c_denom is not None and c_denom <= 0.0:
             raise ValueError(f"Invalid c_denom: {c_denom} (must be positive or None)")
 
-        variant_enum = OrScaleVariant(variant)
+        variant_enum = normalize_orscale_variant(variant)
 
         defaults = dict(
             lr=lr,
@@ -210,6 +220,7 @@ class OrScaleOptimizer(Optimizer):
             use_shape_norm = variant in (
                 OrScaleVariant.ORSCALE_MUON_MOONLIGHT,
                 OrScaleVariant.ORSCALE_MUON_MOONLIGHT_CALIBRATED,
+                OrScaleVariant.ORSCALE_LM,
                 OrScaleVariant.MUSCALE,
                 OrScaleVariant.MUSCALE_ALPHA,
             )
@@ -218,16 +229,16 @@ class OrScaleOptimizer(Optimizer):
                 OrScaleVariant.ORSCALE_MUON,
             )
             use_grad_matrix_denom = variant in (
-                OrScaleVariant.ORSCALE_MUON_WD,
+                OrScaleVariant.ORSCALE,
                 OrScaleVariant.ORSCALE_MUON_MOONLIGHT,
             )
             use_calibrated_denom = (
-                variant == OrScaleVariant.ORSCALE_MUON_MOONLIGHT_CALIBRATED
+                variant == OrScaleVariant.ORSCALE_LM
             )
             scale_wd_with_trust = variant in (
-                OrScaleVariant.ORSCALE_MUON_WD,
+                OrScaleVariant.ORSCALE,
                 OrScaleVariant.ORSCALE_MUON_MOONLIGHT,
-                OrScaleVariant.ORSCALE_MUON_MOONLIGHT_CALIBRATED,
+                OrScaleVariant.ORSCALE_LM,
             )
             effective_alpha = alpha if variant == OrScaleVariant.MUSCALE_ALPHA else 1.0
 
@@ -312,7 +323,7 @@ class OrScaleOptimizer(Optimizer):
                     # Coupled denominator c_denom_ℓ * ||λW + s·Q||_F.
                     #
                     # The denominator is the same "real update direction"
-                    # ||λW + s·Q||_F used by ``orscale_muon_moonlight``,
+                    # ||λW + s·Q||_F used by the Moonlight-shaped variants,
                     # rescaled by a per-layer constant c_denom_ℓ that anchors
                     # r_ℓ(0) = 1.  c_denom_ℓ is set per layer at the first
                     # step from

@@ -31,13 +31,12 @@ training:
   label_smoothing: 0.1
 
 optimizer:
-  name: muscale_alpha
+  name: orscale
   lr: 0.002                  # -> sqrt(32768/512)=8x -> ~0.016
   sqrt_lr_scaling: true
   sqrt_lr_scaling_base_batch: 512
   momentum: 0.95
   weight_decay: 1.0e-4
-  alpha: 0.5
   r_min: 0.5
   r_max: 1.5
   eps: 1.0e-6

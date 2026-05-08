@@ -7,19 +7,19 @@ Runs can be executed sequentially or in parallel via subprocess.
 
 Usage:
     python scripts/sweep.py --config configs/pilot_25m.yaml \
-        --sweep optimizer.name=muon,muscale_alpha optimizer.lr=0.01,0.02,0.05 \
+        --sweep optimizer.name=muon,orscale_lm optimizer.lr=0.01,0.02,0.05 \
         --seeds 3
 
     python scripts/sweep.py --config configs/pilot_25m.yaml \
-        --sweep optimizer.name=adamw,muon,muon_moonlight,orscale_muon,orscale_muon_wd,orscale_muon_moonlight,orscale_muon_moonlight_calibrated,mutrust,muscale,muscale_alpha \
+        --sweep optimizer.name=adamw,muon,muon_moonlight,orscale,orscale_lm \
         --seeds 1 --parallel 4
 
-Note: ``orscale_muon_moonlight_calibrated`` should typically be run with
+Note: ``orscale_lm`` should typically be run with
 looser trust-ratio bounds (LARS/LAMB-style) than the YAML default. Pass them
 through the same --sweep mechanism as singleton lists, e.g.
 
     python scripts/sweep.py --config configs/small_125m.yaml \
-        --sweep optimizer.name=orscale_muon_moonlight_calibrated \
+        --sweep optimizer.name=orscale_lm \
                 optimizer.lr=3e-4,1e-3,3e-3 \
                 optimizer.r_min=0.1 optimizer.r_max=5.0 \
         --seeds 1

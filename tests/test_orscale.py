@@ -49,6 +49,8 @@ def _run_optimizer_steps(opt_cls, opt_kwargs, steps=10):
 
 
 @pytest.mark.parametrize("variant", [
+    "orscale",
+    "orscale_lm",
     "orscale_original",
     "orscale_muon",
     "orscale_muon_wd",

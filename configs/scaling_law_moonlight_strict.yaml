@@ -47,7 +47,7 @@ estimate_pflops_per_second: 0.5
 
 presets:
   # Per-preset ``lr`` is the shared Moonlight Table 2 LR used by ``adamw``,
-  # ``muon_moonlight``, and ``orscale_muon_moonlight_calibrated`` (the strict
+  # ``muon_moonlight``, and ``orscale_lm`` (the strict
   # apples-to-apples cells). ``optimizer_lrs`` overrides the matrix-group LR
   # for one optimizer only -- used here to give uncalibrated
   # ``orscale_muon_moonlight`` its tuned LR per preset (see report rationale
@@ -99,7 +99,7 @@ presets:
     # expandable_segments:True (see scripts/run_moonlight_scaling_8gpu.sh)
     # to additionally harden against fragmentation. Bump back to mbs=16
     # only if memory monitoring shows >40 GB headroom under the heaviest
-    # optimizer (orscale_muon_moonlight_calibrated).
+    # optimizer (orscale_lm).
     micro_batch_size: 8
     lr: 9.143e-4
     optimizer_lrs:
@@ -185,7 +185,7 @@ optimizers:
     adamw_betas: [0.9, 0.95]
     r_min: 0.1
     r_max: 5.0
-  - name: orscale_muon_moonlight_calibrated
+  - name: orscale_lm
     weight_decay: 0.1
     adamw_lr: same_as_lr
     adamw_weight_decay: 0.1

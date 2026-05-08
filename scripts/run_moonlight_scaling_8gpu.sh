@@ -3,7 +3,7 @@
 #
 # Examples:
 #   DRY_RUN=1 OPTIMIZER=adamw bash scripts/run_moonlight_scaling_8gpu.sh
-#   OPTIMIZER=orscale_muon_moonlight_calibrated bash scripts/run_moonlight_scaling_8gpu.sh
+#   OPTIMIZER=orscale_lm bash scripts/run_moonlight_scaling_8gpu.sh
 #   PRESETS=moonlight_399m,moonlight_545m DRY_RUN=1 bash scripts/run_moonlight_scaling_8gpu.sh
 #   PRESETS="fineweb_small_125m moonlight_399m" OPTIMIZER=adamw bash scripts/run_moonlight_scaling_8gpu.sh
 #

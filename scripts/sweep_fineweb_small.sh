@@ -26,11 +26,11 @@
 # Per-family LR grids (split so each optimizer is swept around its known-good
 # operating point given its effective per-entry update magnitude at nominal LR):
 #   Muon grid          : {0.005, 0.01, 0.02, 0.04}   (muon, orscale_muon,
-#                                                     orscale_muon_wd)
+#                                                     orscale)
 #   AdamW / LAMB grid  : {3e-4, 1e-3, 3e-3}          (adamw, lamb)
 #   Moonlight grid     : {3e-4, 1e-3, 3e-3, 5e-3}    (muon_moonlight,
 #                                                     orscale_muon_moonlight,
-#                                                     orscale_muon_moonlight_calibrated)
+#                                                     orscale_lm)
 #   muscale grid       : {1e-4, 3e-4, 5e-4, 1e-3}    (muscale only -- denser
 #                                                     low-LR bracket per
 #                                                     reports/fineweb_small/)
@@ -39,13 +39,13 @@
 # Per-variant trust-ratio clip overrides:
 #   Default (set in YAML)              : r_min=0.5, r_max=1.5
 #     This is the post-2026-04-22 tight clip used by the older OrScale
-#     variants (orscale_muon, orscale_muon_wd, mutrust, muscale).  For
+#     variants (orscale_muon, orscale, mutrust, muscale).  For
 #     mutrust and muscale specifically, this clip is the only thing
 #     keeping the optimizer from running at runaway effective LR -- their
 #     raw ratio is O(1/lr) and saturates the clip on ~100% of steps no
 #     matter what r_max is.
 #   Moonlight-shape variants            : r_min=0.1, r_max=5.0
-#     (orscale_muon_moonlight, orscale_muon_moonlight_calibrated)
+#     (orscale_muon_moonlight, orscale_lm)
 #     These have a shape-constant or auto-calibrated denominator with a
 #     wider natural operating range and benefit from LARS/LAMB-style
 #     looser bounds.  The calibrated variant's denominator is auto-set
@@ -207,9 +207,9 @@ declare -a JOBS=(
   "muon                                MUON"
   "muon_moonlight                      MOONLIGHT"
   "orscale_muon                        MUON"
-  "orscale_muon_wd                     MUON"
+  "orscale                             MUON"
   "orscale_muon_moonlight              MOONLIGHT"
-  "orscale_muon_moonlight_calibrated   MOONLIGHT"
+  "orscale_lm                          MOONLIGHT"
   "mutrust                             MUTRUST"
   "muscale                             MUSCALE"
   "adamw                               ADAM"
@@ -221,7 +221,7 @@ declare -a JOBS=(
 # train.py --set list, or empty when the YAML defaults are correct.
 extra_set_for_opt() {
   case "$1" in
-    orscale_muon_moonlight | orscale_muon_moonlight_calibrated)
+    orscale_muon_moonlight | orscale_lm)
       echo "optimizer.r_min=0.1 optimizer.r_max=5.0"
       ;;
     *)
@@ -247,7 +247,7 @@ if [[ -n "$OPTIMIZERS" ]]; then
     done
     if [[ "$found" -eq 0 ]]; then
       echo "[error] unknown optimizer in OPTIMIZERS: $requested_opt" >&2
-      echo "        valid choices: muon muon_moonlight orscale_muon orscale_muon_wd orscale_muon_moonlight orscale_muon_moonlight_calibrated mutrust muscale adamw lamb" >&2
+      echo "        valid choices: muon muon_moonlight orscale_muon orscale orscale_muon_moonlight orscale_lm mutrust muscale adamw lamb" >&2
       exit 1
     fi
   done

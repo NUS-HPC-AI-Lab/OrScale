@@ -222,6 +222,9 @@ def log_run_summary(
     if opt_cfg.get("name", "").lower() in {
         "muon",
         "muon_moonlight",
+        "orscale",
+        "orscale-lm",
+        "orscale_lm",
         "orscale_original",
         "orscale_muon",
         "orscale_muon_wd",

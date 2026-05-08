@@ -12,8 +12,8 @@ The public release follows the naming used in the NeurIPS paper draft:
 
 | Paper name | Config name | Intended use | Update denominator |
 |---|---|---|---|
-| **OrScale** | `orscale_muon_wd` | General matrix layers, vision experiments | `||lambda W + Q||_F` |
-| **OrScale-LM** | `orscale_muon_moonlight_calibrated` | Language-model pre-training | `c_denom * ||lambda W + s Q||_F`, with `s = 0.2 * sqrt(max(m, n))` |
+| **OrScale** | `orscale` | General matrix layers, vision experiments | `||lambda W + Q||_F` |
+| **OrScale-LM** | `orscale_lm` | Language-model pre-training | `c_denom * ||lambda W + s Q||_F`, with `s = 0.2 * sqrt(max(m, n))` |
 
 `OrScale` is the general recipe. `OrScale-LM` adds Moonlight's shape factor and a one-time per-layer calibration so each trust ratio starts at one, preserving learning-rate transfer for language models.
 
@@ -42,14 +42,14 @@ Language-model smoke run:
 
 ```bash
 python scripts/train.py --config configs/pilot_25m.yaml \
-    --set optimizer.name=orscale_muon_moonlight_calibrated
+    --set optimizer.name=orscale_lm
 ```
 
 CIFAR-10 / DavidNet run:
 
 ```bash
 python scripts/train_vision.py --config configs/cifar10_davidnet.yaml \
-    --set optimizer.name=orscale_muon_wd
+    --set optimizer.name=orscale
 ```
 
 The default configs use relative paths such as `data/fineweb10B/`, `data/cifar10/`, and `checkpoints/`. Override paths with `--set data.train_pattern=... data.val_pattern=... training.save_dir=...`.

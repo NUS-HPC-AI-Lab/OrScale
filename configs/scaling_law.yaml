@@ -50,10 +50,11 @@ optimizers:
   - name: adamw
     lr: 3.0e-4
     weight_decay: 0.1
-  - name: muscale_alpha
+  - name: orscale_lm
     lr: 0.02
     weight_decay: 0.01
-    alpha: 0.5
+    r_min: 0.1
+    r_max: 5.0
     adamw_lr: 3.0e-4
   - name: muon_moonlight
     lr: 0.02
