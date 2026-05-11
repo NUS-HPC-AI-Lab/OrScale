@@ -1,9 +1,32 @@
 cff-version: 1.2.0
-message: "If you use OrScale in your research, please cite this software and the associated paper when available."
-title: "OrScale"
+message: "If you use OrScale in your research, please cite the associated paper."
+title: "OrScale: Orthogonalised Optimization with Layer-Wise Trust-Ratio Scaling"
 version: "0.1.0"
 date-released: "2026-05-08"
 license: "MIT"
 repository-code: "https://github.com/NUS-HPC-AI-Lab/OrScale"
+url: "https://arxiv.org/abs/2605.07815"
 authors:
-  - name: "NUS-HPC-AI-Lab"
+  - family-names: "Lou"
+    given-names: "Yuxuan"
+    affiliation: "National University of Singapore"
+    email: "yuxuanlou@u.nus.edu"
+  - family-names: "You"
+    given-names: "Yang"
+    affiliation: "National University of Singapore"
+    email: "yangyou@nus.edu.sg"
+preferred-citation:
+  type: article
+  title: "OrScale: Orthogonalised Optimization with Layer-Wise Trust-Ratio Scaling"
+  authors:
+    - family-names: "Lou"
+      given-names: "Yuxuan"
+    - family-names: "You"
+      given-names: "Yang"
+  year: 2026
+  journal: "arXiv preprint arXiv:2605.07815"
+  url: "https://arxiv.org/abs/2605.07815"
+  identifiers:
+    - type: other
+      value: "arXiv:2605.07815"
+      description: "arXiv preprint identifier"
