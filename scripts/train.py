@@ -31,6 +31,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from orscale.model.gpt import GPT, GPTConfig, PRESET_CONFIGS
+from orscale.model.moonlight_moe import MoonlightMoEForCausalLM
 from orscale.optim import build_optimizer
 from orscale.data.loader import create_dataloader
 from orscale.diagnostics.logger import DiagnosticLogger
@@ -95,6 +96,29 @@ def build_wandb_run_metadata(config_path: str, config: dict) -> dict[str, object
     }
 
 
+def create_tensorboard_writer(logging_cfg: dict, run_metadata: dict[str, object]):
+    enabled = bool(
+        logging_cfg.get("tensorboard", logging_cfg.get("tensorboard_enabled", False))
+        or logging_cfg.get("tensorboard_log_dir")
+    )
+    if not enabled:
+        return None
+
+    try:
+        from torch.utils.tensorboard import SummaryWriter
+    except ImportError:
+        log_main("tensorboard is not installed, skipping TensorBoard logging.")
+        return None
+
+    base_dir = logging_cfg.get("tensorboard_log_dir", "runs")
+    group = _wandb_slug(run_metadata.get("group", "default"))
+    name = _wandb_slug(run_metadata.get("name", "run"))
+    log_dir = str(Path(base_dir) / group / name)
+    writer = SummaryWriter(log_dir=log_dir)
+    log_main("TensorBoard logging enabled: %s", log_dir)
+    return writer
+
+
 def load_config(path: str) -> dict:
     with open(path) as f:
         return yaml.safe_load(f)
@@ -125,19 +149,61 @@ def apply_overrides(config: dict, overrides: list[str]) -> dict:
     return config
 
 
-def build_model(model_config: dict, device: torch.device) -> GPT:
-    preset = model_config.get("preset")
-    if preset:
-        overrides = {k: v for k, v in model_config.items() if k != "preset"}
-        model = GPT.from_preset(preset, **overrides)
-    else:
-        cfg = GPTConfig(**model_config)
-        model = GPT(cfg)
+def _resolve_param_dtype(value) -> torch.dtype | None:
+    if value is None:
+        return None
+    name = str(value).lower().strip()
+    if name in {"none", "auto", "float32", "fp32"}:
+        return torch.float32 if name in {"float32", "fp32"} else None
+    if name in {"bfloat16", "bf16"}:
+        return torch.bfloat16
+    if name in {"float16", "fp16", "half"}:
+        return torch.float16
+    raise ValueError(f"Unsupported model.param_dtype: {value!r}")
 
-    model = model.to(device)
+
+def build_model(model_config: dict, device: torch.device) -> torch.nn.Module:
+    architecture = str(model_config.get("architecture", "gpt")).lower().strip()
+    param_dtype = _resolve_param_dtype(
+        model_config.get("param_dtype", model_config.get("dtype"))
+    )
+    model_config = {
+        k: v
+        for k, v in model_config.items()
+        if k not in {"architecture", "param_dtype", "dtype"}
+    }
+
+    if architecture in {"moonlight_moe", "moonlight-moe", "deepseek_moe", "deepseek-moe"}:
+        preset = model_config.get("preset", "moonlight_16b_a3b")
+        overrides = {k: v for k, v in model_config.items() if k != "preset"}
+        model = MoonlightMoEForCausalLM.from_preset(preset, **overrides)
+    elif architecture != "gpt":
+        raise ValueError(
+            f"Unknown model architecture: {architecture}. "
+            "Choose 'gpt' or 'moonlight_moe'."
+        )
+    else:
+        preset = model_config.get("preset")
+        if preset:
+            overrides = {k: v for k, v in model_config.items() if k != "preset"}
+            model = GPT.from_preset(preset, **overrides)
+        else:
+            cfg = GPTConfig(**model_config)
+            model = GPT(cfg)
+
+    if param_dtype is None:
+        model = model.to(device)
+    else:
+        model = model.to(device=device, dtype=param_dtype)
     if is_main_process():
         param_count = model.count_parameters()
         LOGGER.info("Model: %.1fM parameters", param_count / 1e6)
+        first_param = next(model.parameters(), None)
+        if first_param is not None:
+            LOGGER.info("Model parameter dtype: %s", first_param.dtype)
+        if hasattr(model, "count_activated_parameters"):
+            active_count = model.count_activated_parameters()
+            LOGGER.info("Active parameters/token: %.1fM", active_count / 1e6)
     return model
 
 
@@ -170,6 +236,7 @@ def log_run_summary(
     train_loader,
     val_loader,
     wandb_enabled: bool,
+    tensorboard_enabled: bool,
 ) -> None:
     if not is_main_process():
         return
@@ -203,18 +270,21 @@ def log_run_summary(
 
     preset = model_cfg.get("preset", "custom")
     log_main(
-        "  model: preset=%s seq_len=%s norm=%s mlp=%s pos=%s tie_weights=%s",
+        "  model: arch=%s preset=%s seq_len=%s norm=%s mlp=%s pos=%s tie_weights=%s",
+        model_cfg.get("architecture", "gpt"),
         preset,
         seq_len,
-        model_cfg.get("norm_type", "default"),
-        model_cfg.get("mlp_type", "default"),
-        model_cfg.get("pos_encoding", "default"),
+        model_cfg.get("norm_type", model_cfg.get("rms_norm_eps", "default")),
+        model_cfg.get("mlp_type", "moe" if model_cfg.get("architecture") else "default"),
+        model_cfg.get("pos_encoding", "rope"),
         model_cfg.get("tie_weights", True),
     )
+    log_main("  model dtype: %s", model_cfg.get("param_dtype", model_cfg.get("dtype", "float32")))
     log_main(
-        "  optimizer: name=%s optimizers=%d lr=%s weight_decay=%s momentum=%s",
+        "  optimizer: name=%s optimizers=%d zero_stage=%s lr=%s weight_decay=%s momentum=%s",
         opt_cfg.get("name", "adamw"),
         len(optimizers),
+        opt_cfg.get("zero_stage", opt_cfg.get("zero", 0)),
         opt_cfg.get("lr", "default"),
         opt_cfg.get("weight_decay", "default"),
         opt_cfg.get("momentum", "n/a"),
@@ -259,6 +329,10 @@ def log_run_summary(
         train_cfg.get("save_every", 0),
     )
     log_main(
+        "  ddp: gradient_as_bucket_view=%s",
+        train_cfg.get("ddp_gradient_as_bucket_view", True),
+    )
+    log_main(
         "  data(train): %s",
         summarize_data_source(data_cfg, "train"),
     )
@@ -276,11 +350,22 @@ def log_run_summary(
         diag_cfg.get("log_every", 50),
         diag_cfg.get("heavy_log_every", 500),
     )
+    if diag_cfg.get("selected_param_patterns"):
+        log_main(
+            "  diagnostics selected params: %s",
+            ", ".join(diag_cfg.get("selected_param_patterns", [])),
+        )
     log_main(
         "  wandb: %s%s",
         "enabled" if wandb_enabled else "disabled",
         f" (project={logging_cfg.get('wandb_project')}, group={logging_cfg.get('wandb_group')})"
         if wandb_enabled else "",
+    )
+    log_main(
+        "  tensorboard: %s%s",
+        "enabled" if tensorboard_enabled else "disabled",
+        f" (dir={logging_cfg.get('tensorboard_log_dir', 'runs')})"
+        if tensorboard_enabled else "",
     )
 
 
@@ -304,23 +389,30 @@ def main():
     seed = config.get("training", {}).get("seed", 42)
     torch.manual_seed(seed + rank)
 
+    run_metadata = build_wandb_run_metadata(args.config, config)
+
     # W&B init
     wandb_run = None
     logging_cfg = config.get("logging", {})
     if logging_cfg.get("wandb_project") and is_main_process():
         try:
             import wandb
-            wandb_metadata = build_wandb_run_metadata(args.config, config)
             wandb_run = wandb.init(
                 project=logging_cfg["wandb_project"],
-                group=wandb_metadata["group"],
-                name=wandb_metadata["name"],
-                job_type=wandb_metadata["job_type"],
-                tags=wandb_metadata["tags"],
+                group=run_metadata["group"],
+                name=run_metadata["name"],
+                job_type=run_metadata["job_type"],
+                tags=run_metadata["tags"],
                 config=config,
             )
         except ImportError:
             log_main("wandb not installed, skipping W&B logging.")
+
+    tensorboard_writer = (
+        create_tensorboard_writer(logging_cfg, run_metadata)
+        if is_main_process()
+        else None
+    )
 
     # Build model
     log_main("Building model...")
@@ -372,6 +464,10 @@ def main():
         log_every=diag_cfg.get("log_every", 50),
         heavy_log_every=diag_cfg.get("heavy_log_every", 500),
         use_wandb=wandb_run is not None,
+        tensorboard_writer=tensorboard_writer,
+        log_per_param=diag_cfg.get("log_per_param", True),
+        selected_param_patterns=diag_cfg.get("selected_param_patterns"),
+        selected_metrics=diag_cfg.get("selected_metrics"),
     )
 
     # Training config for Trainer
@@ -390,6 +486,7 @@ def main():
         config=trainer_config,
         diagnostic_logger=diag_logger,
         device=device,
+        tensorboard_writer=tensorboard_writer,
     )
 
     log_run_summary(
@@ -403,12 +500,15 @@ def main():
         train_loader=train_loader,
         val_loader=val_loader,
         wandb_enabled=wandb_run is not None,
+        tensorboard_enabled=tensorboard_writer is not None,
     )
     log_main("Starting training loop...")
     trainer.train()
 
     if wandb_run is not None:
         wandb_run.finish()
+    if tensorboard_writer is not None:
+        tensorboard_writer.close()
 
     cleanup_distributed()
 

@@ -36,7 +36,15 @@ weight-norm runaway.
   Muon–trust-ratio variants under empirically verified clip saturation.
 - **Empirics.** OrScale ranks first on CIFAR-10 / DavidNet across three seeds,
   and OrScale-LM beats Muon + Moonlight on FineWeb-Edu pre-training at three of
-  four scales (125M → 1.1B parameters) and beats AdamW at every scale.
+  four dense scales (125M → 1.1B parameters), beats AdamW at every scale, and
+  widens the gap to **+0.130 nats** on a Moonlight-16B-A3B mixture-of-experts
+  model at wall-clock parity, with every hyperparameter inherited unchanged
+  from the Moonlight recipe.
+- **Scale.** A Moonlight-16B-A3B MoE implementation (multi-head latent
+  attention, 64 routed + 2 shared experts, aux-loss-free router balancing)
+  with ZeRO-1 optimizer-state sharding designed for Muon-family optimizers,
+  bf16 parameters, activation checkpointing, and TensorBoard logging for
+  offline clusters.
 - **Reproducibility.** Single-command training entry points, deterministic
   configs, and shipped sweep scripts; the public results in this repository
   match the paper's tables and figures.
@@ -86,7 +94,7 @@ Optional extras are split by workflow:
 
 ```bash
 python -m pip install -e ".[dev]"
-python -m pip install -e ".[data,vision,eval,analysis,wandb]"
+python -m pip install -e ".[data,vision,eval,analysis,wandb,tensorboard]"
 ```
 
 For the all-in-one compatibility path:
@@ -116,7 +124,51 @@ The default configs use relative paths such as `data/fineweb10B/`,
 `--set data.train_pattern=... data.val_pattern=... training.save_dir=...`.
 
 W&B logging is opt-in. Set `logging.wandb_project` in the config or via
-command-line overrides to enable it.
+command-line overrides to enable it. TensorBoard logging is opt-in as well:
+set `logging.tensorboard: true` (and optionally `logging.tensorboard_log_dir`)
+to write scalars under `runs/<group>/<name>/`, which is convenient on offline
+clusters.
+
+## Mixture-of-Experts Training
+
+`orscale/model/moonlight_moe.py` implements the public Moonlight-16B-A3B
+architecture (DeepSeek-V3 style): 27 layers, hidden size 2048, multi-head
+latent attention, 64 routed experts with top-6 routing plus 2 shared experts,
+aux-loss-free router-bias balancing (an auxiliary loss is available as an
+option), and 8K context, for 15.96B total / 2.24B active parameters per token.
+Select it with `model.architecture: moonlight_moe`; the `moonlight_16b_a3b`
+preset and a `moonlight_tiny_moe` smoke-test preset
+(`configs/moonlight_moe_tiny.yaml`) are provided.
+
+Training-side features that ship with it (all off unless enabled in the
+config):
+
+| Config key | Effect |
+|---|---|
+| `optimizer.zero_stage: 1` | ZeRO-1-style optimizer-state sharding for Muon-family optimizers: parameters and gradients stay replicated so the orthogonalised update sees the full matrix, while momentum / Adam moments are partitioned across ranks and owner ranks broadcast updated parameters after each step. Checkpoints store per-rank optimizer sidecars next to the model file. |
+| `model.param_dtype: bfloat16` | Keep parameters in bf16 instead of fp32 master weights. |
+| `model.checkpoint_moe` / `model.checkpoint_mlp` | Activation checkpointing for the expert / MLP blocks. |
+| `diagnostics.log_per_param: false` + `diagnostics.selected_param_patterns` | Log per-layer trust ratios only for glob-selected parameters, alongside cross-layer mean / p05 / p50 / p95 / std aggregates, instead of one entry per matrix layer. |
+
+The 16B-A3B comparison in the paper is launched with the wrapper below. It
+derives the 10B-token step count from
+`configs/moonlight_moe_16b_fineweb10b_compare.yaml` and runs one optimizer
+cell at a time; it defaults to `DRY_RUN=1` and only prints the commands:
+
+```bash
+# Print the derived commands for every optimizer cell.
+bash scripts/run_moonlight_moe_16b_fineweb10b.sh
+
+# Launch one cell on 8 GPUs (torchrun --standalone --nproc_per_node=8).
+OPTIMIZER=orscale_lm DRY_RUN=0 \
+    TRAIN_PATTERN="data/fineweb10B/fineweb_train_*.bin" \
+    VAL_PATTERN="data/fineweb10B/fineweb_val_*.bin" \
+    bash scripts/run_moonlight_moe_16b_fineweb10b.sh
+```
+
+Expert / model-state parallelism is not implemented: every data-parallel rank
+materialises all routed experts, so the 16B configuration is sized for a single
+8-GPU node (the paper's runs used 8 × H20).
 
 ## Empirical Results
 
@@ -158,6 +210,37 @@ $\alpha = -0.054$ (AdamW), $-0.053$ (Muon + Moonlight), and $-0.052$
 (OrScale-LM); the OrScale-LM advantage is approximately preserved across the
 swept compute range.
 
+### Moonlight-16B-A3B MoE (FineWeb-Edu, 10B tokens)
+
+Head-to-head pre-training on the Moonlight-16B-A3B mixture-of-experts
+architecture, 14.5× the parameter count of the largest dense run: 8K context,
+2048 sequences (16.8M tokens) per step, 596 steps ≈ 10B FineWeb-Edu tokens,
+bf16, ZeRO-1, 8 × H20, seed 42. Every arm uses the Moonlight-recipe
+hyperparameters for this scale (LR 4.2e-4, weight decay 0.1, momentum 0.95,
+warmup 60 steps, cosine decay), shared by AdamW and Muon + Moonlight by
+construction and inherited unchanged by OrScale-LM, which was never swept.
+
+![Moonlight-16B-A3B MoE validation cross-entropy](assets/moe16b_val_loss_full.png)
+
+*Left:* validation cross-entropy over FineWeb-Edu tokens (inset: final 6B
+tokens). *Right:* final values.
+
+| Optimizer | $r_{\min}$ / $r_{\max}$ | Final val CE | Δ vs. Muon + Moonlight | Wall-clock |
+|---|:---:|---:|---:|---:|
+| AdamW | — | 5.2002 | −1.7287 | 3.93 d |
+| Muon + Moonlight | — | 3.4715 | — | 4.98 d |
+| OrScale-LM ($r_{\max}=10$) | 0.1 / 10 | 3.3556 | +0.1159 | 4.92 d |
+| **OrScale-LM** (ours) | 0.1 / 5 | **3.3410** | **+0.1305** | 4.92 d |
+
+OrScale-LM improves on Muon + Moonlight by **0.130 nats (3.8 % relative)** at
+wall-clock parity, an order of magnitude beyond the +0.011-nat gap at 1.1B
+dense. It leads at every validation checkpoint from about 2.5B tokens onward
+and passes Muon + Moonlight's final loss with roughly a third of the tokens
+still to go. The looser $r_{\max}=10$ arm also beats Muon + Moonlight, so the
+gain is not an artefact of a tight clip. Caveats: a single seed per arm (about
+five days per arm), and the AdamW arm runs at the shared recipe LR following
+the Moonlight protocol rather than at a retuned AdamW optimum.
+
 ## Data Preparation
 
 FineWeb-Edu token shards:
@@ -181,19 +264,19 @@ ImageNet expects the standard `ImageFolder` layout. See
 pytest tests/ -v
 ```
 
-On CPU-only machines without an OpenMP-capable compiler:
-
-```bash
-TORCH_COMPILE_DISABLE=1 pytest tests/ -v
-```
+The Newton–Schulz kernel is compiled with `torch.compile` only when CUDA is
+available, so CPU-only machines need no extra flags. To opt out of compilation
+on GPU machines (for example while debugging), set
+`ORSCALE_DISABLE_TORCH_COMPILE=1`.
 
 ## Repository Layout
 
 ```text
-orscale/      Core optimizers, models, data loaders, trainers, eval, analysis
-configs/      Example LM, vision, and scaling-law configs
+orscale/      Core optimizers, models (GPT, Moonlight MoE), data loaders, trainers, eval, analysis
+configs/      Example LM, MoE, vision, and scaling-law configs
 scripts/      Training, data preparation, evaluation, and sweep entry points
 tests/        Unit and smoke tests
+assets/       Figures embedded in this README
 ```
 
 Generated outputs under `results/`, `reports/`, checkpoints, datasets,
@@ -201,6 +284,8 @@ W&B runs, and local logs are intentionally git-ignored.
 
 ## Roadmap
 
+- Expert / model-state parallelism for the MoE path (ZeRO-1 currently shards
+  optimizer state only).
 - Larger-scale empirical evaluation of OrScale on additional vision and
   language benchmarks.
 - TPU adaptation of the orthogonalised front end and trust-ratio computation.

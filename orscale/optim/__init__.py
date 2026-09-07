@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 import torch
+import torch.distributed as dist
 from torch import nn
 
 from orscale.optim.lamb import LAMB
@@ -19,6 +20,11 @@ from orscale.optim.orscale_optimizer import (
     OrScaleVariant,
     normalize_orscale_variant,
 )
+from orscale.optim.zero1 import (
+    Zero1Optimizer,
+    local_zero1_params,
+    make_zero1_partitions,
+)
 
 __all__ = [
     "Muon",
@@ -26,6 +32,7 @@ __all__ = [
     "OrScaleVariant",
     "normalize_orscale_variant",
     "LAMB",
+    "Zero1Optimizer",
     "build_optimizer",
 ]
 
@@ -118,25 +125,52 @@ def build_optimizer(
         A single optimizer or a list [matrix_opt, nonmatrix_opt].
     """
     name = name.lower().strip()
+    zero_stage = int(config.get("zero_stage", config.get("zero", 0)) or 0)
+    use_zero1 = (
+        zero_stage == 1
+        and dist.is_initialized()
+        and dist.get_world_size() > 1
+    )
+    zero_partitions = make_zero1_partitions(model) if use_zero1 else None
+    zero_rank = dist.get_rank() if use_zero1 else 0
+
+    def maybe_wrap_zero1(local_opts: list[torch.optim.Optimizer], *, as_list: bool = False):
+        if not use_zero1:
+            if as_list:
+                return local_opts
+            return local_opts[0] if len(local_opts) == 1 else local_opts
+        return [Zero1Optimizer(local_opts, zero_partitions or [])]
 
     if name == "adamw":
-        return torch.optim.AdamW(
-            model.parameters(),
+        params = list(model.parameters())
+        if use_zero1:
+            params = local_zero1_params(params, zero_partitions or [], zero_rank)
+            if not params:
+                return maybe_wrap_zero1([])
+        opt = torch.optim.AdamW(
+            params,
             lr=config.get("lr", 1e-3),
             betas=tuple(config.get("betas", (0.9, 0.999))),
             eps=config.get("eps", 1e-8),
             weight_decay=config.get("weight_decay", 0.01),
         )
+        return maybe_wrap_zero1([opt])
 
     if name == "lamb":
-        return LAMB(
-            model.parameters(),
+        params = list(model.parameters())
+        if use_zero1:
+            params = local_zero1_params(params, zero_partitions or [], zero_rank)
+            if not params:
+                return maybe_wrap_zero1([])
+        opt = LAMB(
+            params,
             lr=config.get("lr", 1e-3),
             betas=tuple(config.get("betas", (0.9, 0.999))),
             eps=config.get("eps", 1e-6),
             weight_decay=config.get("weight_decay", 0.01),
             clamp_value=config.get("clamp_value", 10.0),
         )
+        return maybe_wrap_zero1([opt])
 
     if name not in _MUON_FAMILY:
         raise ValueError(
@@ -153,6 +187,10 @@ def build_optimizer(
             "Muon-family optimizers require at least one 2D parameter."
         )
 
+    if use_zero1:
+        matrix_params = local_zero1_params(matrix_params, zero_partitions or [], zero_rank)
+        nonmatrix_params = local_zero1_params(nonmatrix_params, zero_partitions or [], zero_rank)
+
     # Build AdamW for non-matrix params
     adamw_opt = None
     if nonmatrix_params:
@@ -164,8 +202,11 @@ def build_optimizer(
             weight_decay=config.get("adamw_weight_decay", config.get("weight_decay", 0.01)),
         )
 
-    # Build the Muon-family optimizer for matrix params
-    if name == "muon":
+    # Build the Muon-family optimizer for matrix params.
+    matrix_opt = None
+    if not matrix_params:
+        matrix_opt = None
+    elif name == "muon":
         matrix_opt = Muon(
             matrix_params,
             lr=config.get("lr", 0.02),
@@ -213,6 +254,7 @@ def build_optimizer(
             c_denom=config.get("c_denom", None),
         )
 
+    local_opts = [opt for opt in [matrix_opt] if opt is not None]
     if adamw_opt is not None:
-        return [matrix_opt, adamw_opt]
-    return [matrix_opt]
+        local_opts.append(adamw_opt)
+    return maybe_wrap_zero1(local_opts, as_list=True)

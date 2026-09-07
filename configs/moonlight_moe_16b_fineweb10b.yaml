@@ -1,0 +1,87 @@
+# Moonlight-16B-A3B style MoE on FineWeb-10B.
+#
+# This is the base train.py config. For optimizer comparison, prefer
+# configs/moonlight_moe_16b_fineweb10b_compare.yaml plus
+# scripts/run_moonlight_moe_16b_fineweb10b.sh, which derive the 10B-token
+# step count and launch one optimizer cell at a time.
+#
+# Important runtime note:
+#   The default optimizer.zero_stage=1 shards optimizer state across data-parallel
+#   ranks while keeping full parameters/gradients replicated for Muon's matrix
+#   orthogonalization. Model-state sharding / expert parallelism is still not
+#   implemented, so full 16B memory should be validated on the target 8xH100 node.
+
+model:
+  architecture: moonlight_moe
+  preset: moonlight_16b_a3b
+  param_dtype: bfloat16
+  max_seq_len: 8192
+  loss_chunk_size: 1024
+  checkpoint_moe: true
+  checkpoint_mlp: false
+  router_aux_loss_alpha: 0.0
+  router_bias_update_rate: 1.0e-3
+
+data:
+  train_pattern: "data/fineweb10B/fineweb_train_*.bin"
+  val_pattern: "data/fineweb10B/fineweb_val_*.bin"
+  streaming: true
+
+training:
+  # With 8 GPUs, batch_size=1 and grad_accum_steps=256 gives the paper-style
+  # 2048 examples per step at 8K context length. FineWeb-10B is then roughly
+  # 596 optimizer steps.
+  max_steps: 596
+  warmup_steps: 60
+  grad_accum_steps: 256
+  precision: bfloat16
+  grad_clip_norm: 1.0
+  ddp_gradient_as_bucket_view: true
+  val_every: 50
+  val_steps: 10
+  log_every: 1
+  save_every: 100
+  save_dir: checkpoints/moonlight_moe_16b_fineweb10b
+  batch_size: 1
+  seed: 42
+
+optimizer:
+  name: muon_moonlight
+  zero_stage: 1
+  lr: 4.2e-4
+  momentum: 0.95
+  weight_decay: 0.1
+  ns_iters: 5
+  adamw_lr: 4.2e-4
+  adamw_betas: [0.9, 0.95]
+  adamw_weight_decay: 0.1
+
+diagnostics:
+  log_every: 10
+  heavy_log_every: 100
+  log_per_param: false
+  selected_param_patterns:
+    - "layers.0.self_attn.o_proj.weight"
+    - "layers.13.self_attn.o_proj.weight"
+    - "layers.26.self_attn.o_proj.weight"
+    - "layers.1.mlp.gate.weight"
+    - "layers.13.mlp.gate.weight"
+    - "layers.26.mlp.gate.weight"
+    - "layers.1.mlp.experts.0.down_proj.weight"
+    - "layers.13.mlp.experts.0.down_proj.weight"
+    - "layers.26.mlp.experts.0.down_proj.weight"
+    - "layers.26.mlp.shared_experts.down_proj.weight"
+  selected_metrics:
+    - trust_ratio_clipped
+    - trust_ratio_raw
+    - update_to_param_ratio
+    - W_rms
+    - shape_scale
+    - clip_active
+    - c_denom
+
+logging:
+  wandb_project:
+  wandb_group: moonlight_moe_16b_fineweb10b
+  tensorboard: true
+  tensorboard_log_dir: runs/moonlight_moe_16b_fineweb10b

@@ -1,0 +1,62 @@
+# OrScale vs Moonlight Muon on the Moonlight-16B-A3B MoE shape.
+#
+# The preset follows the public Moonlight MoE dimensions:
+#   hidden=2048, layers=27, heads=16, routed experts=64, top-k=6,
+#   shared experts=2, 8K context.
+#
+# The active parameter count is used for FLOP planning because MoE training
+# compute scales with activated experts. ZeRO-1 shards optimizer state, but the
+# model itself still materializes all routed experts on each data-parallel rank.
+
+base_config: configs/moonlight_moe_16b_fineweb10b.yaml
+output_dir: results/moonlight_moe_16b_fineweb10b
+seeds: 1
+seed_base: 42
+
+world_size: 8
+micro_batch_size: 1
+estimate_pflops_per_second: 0.5
+
+presets:
+  - name: moonlight_16b_a3b_fineweb10b
+    model_preset: moonlight_16b_a3b
+    # Approximate activated params/token including embeddings/head, matching
+    # the paper's 3B activated / 16B total naming.
+    params: 3.0e9
+    total_params: 1.6e10
+    tokens: 1.0e10
+    seq_len: 8192
+    batch_examples: 2048
+    micro_batch_size: 1
+    lr: 4.2e-4
+    overrides:
+      training.warmup_steps: 60
+      training.val_every: 50
+      training.val_steps: 10
+      training.save_every: 100
+
+optimizers:
+  - name: muon_moonlight
+    zero_stage: 1
+    weight_decay: 0.1
+    momentum: 0.95
+    ns_iters: 5
+    adamw_lr: same_as_lr
+    adamw_weight_decay: 0.1
+    adamw_betas: [0.9, 0.95]
+  - name: orscale_lm
+    zero_stage: 1
+    weight_decay: 0.1
+    momentum: 0.95
+    ns_iters: 5
+    r_min: 0.1
+    r_max: 5.0
+    adamw_lr: same_as_lr
+    adamw_weight_decay: 0.1
+    adamw_betas: [0.9, 0.95]
+
+launcher:
+  command: torchrun
+  extra_args:
+    - --standalone
+    - --nproc_per_node=8

@@ -21,7 +21,12 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from orscale.diagnostics.logger import DiagnosticLogger
 from orscale.training.scheduler import CosineWithWarmup
-from orscale.utils.distributed import is_main_process, get_world_size, reduce_mean
+from orscale.utils.distributed import (
+    get_rank,
+    get_world_size,
+    is_main_process,
+    reduce_mean,
+)
 
 
 class Trainer:
@@ -49,6 +54,7 @@ class Trainer:
         config: dict[str, Any] | None = None,
         diagnostic_logger: DiagnosticLogger | None = None,
         device: torch.device | None = None,
+        tensorboard_writer=None,
     ):
         self.config = config or {}
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -82,13 +88,20 @@ class Trainer:
         # Wrap model in DDP if distributed.
         if get_world_size() > 1:
             local_rank = int(os.environ.get("LOCAL_RANK", 0))
-            self.model = DDP(self.model, device_ids=[local_rank])
+            self.model = DDP(
+                self.model,
+                device_ids=[local_rank],
+                gradient_as_bucket_view=bool(
+                    self.config.get("ddp_gradient_as_bucket_view", True)
+                ),
+            )
 
         self.optimizers = optimizers if isinstance(optimizers, list) else [optimizers]
         self.scheduler = scheduler
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.diag = diagnostic_logger
+        self.tensorboard_writer = tensorboard_writer
 
         # Config
         self.max_steps = self.config.get("max_steps", 5000)
@@ -105,7 +118,11 @@ class Trainer:
         self.checkpoint_wait_timeout = float(
             self.config.get("checkpoint_wait_timeout", 7200)
         )
-        self.use_amp = self.config.get("precision", "bfloat16") == "bfloat16"
+        self.amp_device_type = self.device.type
+        self.use_amp = (
+            self.config.get("precision", "bfloat16") == "bfloat16"
+            and self.amp_device_type in {"cuda", "cpu"}
+        )
 
         # Global gradient-norm clipping (applied after backward, before opt.step,
         # so it affects every optimizer in self.optimizers -- Muon-family matrix
@@ -144,6 +161,8 @@ class Trainer:
         step = 0
         t0 = time.perf_counter()
         running_loss = 0.0
+        running_lm_loss = 0.0
+        running_aux_loss = 0.0
         tokens_seen = 0
 
         while step < self.max_steps:
@@ -152,6 +171,8 @@ class Trainer:
 
             # --- Accumulation loop ---
             total_loss = 0.0
+            total_lm_loss = 0.0
+            total_aux_loss = 0.0
             for micro_step in range(self.grad_accum_steps):
                 input_ids, targets = next(train_iter)
                 input_ids = input_ids.to(self.device, non_blocking=True)
@@ -164,12 +185,25 @@ class Trainer:
                     else nullcontext()
                 )
                 with sync_context:
-                    with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=self.use_amp):
+                    with torch.autocast(
+                        device_type=self.amp_device_type,
+                        dtype=amp_dtype,
+                        enabled=self.use_amp,
+                    ):
                         output = model(input_ids, targets)
-                        loss = output["loss"] / self.grad_accum_steps
+                        raw_loss = output["loss"]
+                        loss = raw_loss / self.grad_accum_steps
 
                     loss.backward()
                 total_loss += loss.item()
+                total_lm_loss += (
+                    output.get("lm_loss", raw_loss).detach().item()
+                    / self.grad_accum_steps
+                )
+                total_aux_loss += (
+                    output.get("aux_loss", raw_loss.new_zeros(())).detach().item()
+                    / self.grad_accum_steps
+                )
 
             # --- Gradient clipping (global, on the raw model params) ---
             # Using the unwrapped module is correct under DDP: DDP's gradient
@@ -185,6 +219,12 @@ class Trainer:
             else:
                 self._last_grad_norm = None
 
+            # Apply aux-free MoE router-bias updates after backward so activation
+            # checkpoint recomputation observes the same routing bias as the
+            # original forward pass.
+            if hasattr(self.raw_model, "apply_router_bias_updates"):
+                self.raw_model.apply_router_bias_updates()
+
             # --- Optimizer step ---
             for opt in self.optimizers:
                 opt.step()
@@ -193,6 +233,8 @@ class Trainer:
 
             step += 1
             running_loss += total_loss
+            running_lm_loss += total_lm_loss
+            running_aux_loss += total_aux_loss
             batch_tokens = input_ids.numel() * self.grad_accum_steps * get_world_size()
             tokens_seen += batch_tokens
 
@@ -200,11 +242,15 @@ class Trainer:
             if is_main_process() and step % self.log_every == 0:
                 elapsed = time.perf_counter() - t0
                 avg_loss = running_loss / self.log_every
+                avg_lm_loss = running_lm_loss / self.log_every
+                avg_aux_loss = running_aux_loss / self.log_every
                 lr_mult = self.scheduler.get_last_lr(step)
                 tok_per_sec = tokens_seen / elapsed if elapsed > 0 else 0
 
                 log_dict = {
                     "train/loss": avg_loss,
+                    "train/lm_loss": avg_lm_loss,
+                    "train/aux_loss": avg_aux_loss,
                     "train/lr_multiplier": lr_mult,
                     "train/tokens_per_sec": tok_per_sec,
                     "train/tokens_seen": tokens_seen,
@@ -219,6 +265,8 @@ class Trainer:
 
                 if self._wandb is not None:
                     self._wandb.log(log_dict, step=step)
+                if self.tensorboard_writer is not None:
+                    self._log_tensorboard(log_dict, step, self.tensorboard_writer)
 
                 gn_str = (
                     f" | grad_norm {self._last_grad_norm:.3f}"
@@ -227,15 +275,23 @@ class Trainer:
                 print(
                     f"step {step}/{self.max_steps} | "
                     f"loss {avg_loss:.4f} | "
+                    f"lm {avg_lm_loss:.4f} | "
+                    f"aux {avg_aux_loss:.4f} | "
                     f"lr_mult {lr_mult:.4f} | "
                     f"tok/s {tok_per_sec:.0f}"
                     f"{gn_str}"
                 )
                 running_loss = 0.0
+                running_lm_loss = 0.0
+                running_aux_loss = 0.0
 
             # --- Diagnostics ---
             if self.diag is not None:
-                self.diag.collect(step)
+                diag_metrics = self.diag.collect(step)
+                if diag_metrics is not None and is_main_process():
+                    diag_line = self.diag.format_console_summary(diag_metrics)
+                    if diag_line:
+                        print(f"step {step}/{self.max_steps} | diagnostics | {diag_line}")
 
             # --- Validation ---
             if self.val_loader is not None and self.val_every > 0 and step % self.val_every == 0:
@@ -244,6 +300,8 @@ class Trainer:
                     print(f"step {step}/{self.max_steps} | val_loss {val_loss:.4f}")
                     if self._wandb is not None:
                         self._wandb.log({"val/loss": val_loss}, step=step)
+                    if self.tensorboard_writer is not None:
+                        self.tensorboard_writer.add_scalar("val/loss", val_loss, step)
 
             # --- Checkpoint ---
             if self.save_every > 0 and step % self.save_every == 0:
@@ -264,6 +322,8 @@ class Trainer:
                 print(f"Final val_loss: {val_loss:.4f}")
                 if self._wandb is not None:
                     self._wandb.log({"val/loss": val_loss}, step=step)
+                if self.tensorboard_writer is not None:
+                    self.tensorboard_writer.add_scalar("val/loss", val_loss, step)
 
         if is_main_process():
             elapsed = time.perf_counter() - t0
@@ -288,7 +348,11 @@ class Trainer:
             input_ids = input_ids.to(self.device, non_blocking=True)
             targets = targets.to(self.device, non_blocking=True)
 
-            with torch.autocast(device_type="cuda", dtype=amp_dtype, enabled=self.use_amp):
+            with torch.autocast(
+                device_type=self.amp_device_type,
+                dtype=amp_dtype,
+                enabled=self.use_amp,
+            ):
                 output = model(input_ids, targets)
 
             total_loss += output["loss"].item()
@@ -305,6 +369,10 @@ class Trainer:
 
     def save_checkpoint_distributed(self, step: int) -> None:
         """Save on rank 0 while keeping other DDP ranks aligned."""
+        if self._uses_sharded_optimizer():
+            self.save_sharded_checkpoint_distributed(step)
+            return
+
         path = self._checkpoint_path(step)
         marker_path = f"{path}.done"
         wait_started_at = time.time()
@@ -348,8 +416,54 @@ class Trainer:
         torch.save(state, path)
         print(f"Checkpoint saved: {path}")
 
+    def save_sharded_checkpoint_distributed(self, step: int) -> None:
+        """Save model on rank 0 and ZeRO-1 optimizer sidecars on every rank."""
+        path = self._checkpoint_path(step)
+        marker_path = f"{path}.done"
+        marker_token = f"step={step}"
+        os.makedirs(self.save_dir, exist_ok=True)
+
+        if is_main_process():
+            try:
+                os.remove(marker_path)
+            except FileNotFoundError:
+                pass
+
+        self._distributed_barrier()
+
+        rank = get_rank()
+        optim_path = self._zero1_optimizer_path(step, rank)
+        optim_state = {
+            "step": step,
+            "rank": rank,
+            "world_size": get_world_size(),
+            "optimizers": [opt.state_dict() for opt in self.optimizers],
+        }
+        torch.save(optim_state, optim_path)
+
+        if is_main_process():
+            state = {
+                "step": step,
+                "model": self.raw_model.state_dict(),
+                "config": self.config,
+                "optimizers_sharded": True,
+                "optimizer_sidecar_pattern": self._zero1_optimizer_path(step, "*"),
+            }
+            torch.save(state, path)
+
+        self._distributed_barrier()
+        if is_main_process():
+            with open(marker_path, "w") as f:
+                f.write(f"{marker_token}\npath={path}\n")
+            print(f"Sharded checkpoint saved: {path} (+ rank optimizer sidecars)")
+
+        self._distributed_barrier()
+
     def _checkpoint_path(self, step: int) -> str:
         return os.path.join(self.save_dir, f"step_{step:06d}.pt")
+
+    def _zero1_optimizer_path(self, step: int, rank: int | str) -> str:
+        return f"{self._checkpoint_path(step)}.rank{rank}.optim.pt"
 
     @staticmethod
     def _resolve_checkpoint_dir(
@@ -405,10 +519,28 @@ class Trainer:
         """Load a checkpoint and return the step number."""
         state = torch.load(path, map_location=self.device, weights_only=False)
         self.raw_model.load_state_dict(state["model"])
-        for opt, opt_state in zip(self.optimizers, state["optimizers"]):
-            opt.load_state_dict(opt_state)
+        if state.get("optimizers_sharded"):
+            optim_path = f"{path}.rank{get_rank()}.optim.pt"
+            optim_state = torch.load(optim_path, map_location=self.device, weights_only=False)
+            for opt, opt_state in zip(self.optimizers, optim_state["optimizers"]):
+                opt.load_state_dict(opt_state)
+        else:
+            for opt, opt_state in zip(self.optimizers, state["optimizers"]):
+                opt.load_state_dict(opt_state)
         print(f"Loaded checkpoint from {path} (step {state['step']})")
         return state["step"]
+
+    @staticmethod
+    def _log_tensorboard(metrics: dict[str, Any], step: int, writer=None) -> None:
+        tb = writer
+        if tb is None:
+            return
+        for key, value in metrics.items():
+            if isinstance(value, (int, float)) and math.isfinite(float(value)):
+                tb.add_scalar(key, float(value), step)
+
+    def _uses_sharded_optimizer(self) -> bool:
+        return any(getattr(opt, "is_zero1", False) for opt in self.optimizers)
 
     @staticmethod
     def _make_infinite_iter(loader) -> Iterator:

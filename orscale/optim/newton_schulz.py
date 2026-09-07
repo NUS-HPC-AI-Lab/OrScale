@@ -9,6 +9,8 @@ The key property: for M = U S V^T (SVD), orthogonalize(M) ≈ U V^T.
 After orthogonalization, ||Q||_F ≈ sqrt(min(m, n)) for full-rank matrices.
 """
 
+import os
+
 import torch
 from torch import Tensor
 
@@ -20,7 +22,11 @@ POLAR_EXPRESS_COEFFS = [
     (2.3465413258596377, -1.7097828382687081, 0.42323551169305323),
 ]
 
-_compile = getattr(torch, "compile", None)
+_compile = (
+    getattr(torch, "compile", None)
+    if torch.cuda.is_available() and os.environ.get("ORSCALE_DISABLE_TORCH_COMPILE") != "1"
+    else None
+)
 _maybe_compile = (
     _compile(dynamic=False, fullgraph=True)
     if _compile is not None

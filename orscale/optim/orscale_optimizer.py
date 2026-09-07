@@ -238,6 +238,7 @@ class OrScaleOptimizer(Optimizer):
             scale_wd_with_trust = variant in (
                 OrScaleVariant.ORSCALE,
                 OrScaleVariant.ORSCALE_MUON_MOONLIGHT,
+                OrScaleVariant.ORSCALE_MUON_MOONLIGHT_CALIBRATED,
                 OrScaleVariant.ORSCALE_LM,
             )
             effective_alpha = alpha if variant == OrScaleVariant.MUSCALE_ALPHA else 1.0

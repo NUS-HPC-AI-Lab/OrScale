@@ -11,6 +11,7 @@ Supports:
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from dataclasses import dataclass
 
@@ -125,8 +126,10 @@ class RMSNorm(nn.Module):
         weight = self.weight.to(dtype=x.dtype) if self.weight.dtype != x.dtype else self.weight
         if hasattr(F, "rms_norm"):
             return F.rms_norm(x, self.weight.shape, weight, self.eps)
-        normed = x * torch.rsqrt(x.float().pow(2).mean(dim=-1, keepdim=True) + self.eps).to(x.dtype)
-        return normed * weight
+
+        y = x.float()
+        y = y * torch.rsqrt(y.pow(2).mean(dim=-1, keepdim=True) + self.eps)
+        return y.to(dtype=x.dtype) * weight
 
 
 def build_norm(dim: int, norm_type: str) -> nn.Module:
@@ -433,7 +436,8 @@ class GPT(nn.Module):
         """Create a GPT model from a named preset (tiny, small, medium)."""
         if name not in PRESET_CONFIGS:
             raise ValueError(f"Unknown preset: {name}. Choose from {list(PRESET_CONFIGS.keys())}")
-        cfg = PRESET_CONFIGS[name]
+        # Copy so overrides never mutate the shared preset instance.
+        cfg = dataclasses.replace(PRESET_CONFIGS[name])
         # Apply overrides
         for k, v in overrides.items():
             if hasattr(cfg, k):

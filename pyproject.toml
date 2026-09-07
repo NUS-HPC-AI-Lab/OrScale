@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "orscale"
-version = "0.1.0"
+version = "0.2.0"
 description = "Orthogonalized updates with layer-wise scaling for language model training."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -58,6 +58,9 @@ vision = [
 wandb = [
   "wandb",
 ]
+tensorboard = [
+  "tensorboard",
+]
 dev = [
   "pytest",
 ]
@@ -67,6 +70,7 @@ all = [
   "lm-eval>=0.4.0",
   "matplotlib>=3.6.0",
   "scipy>=1.10.0",
+  "tensorboard",
   "tiktoken",
   "torchvision>=0.17.0",
   "wandb",
@@ -79,3 +83,9 @@ Issues = "https://github.com/NUS-HPC-AI-Lab/OrScale/issues"
 
 [tool.setuptools.packages.find]
 include = ["orscale*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Tests import helpers from scripts/ (e.g. scripts.train, scripts.run_scaling_law);
+# the editable install only exposes the orscale package, so add the repo root.
+pythonpath = ["."]
